@@ -9,6 +9,8 @@
 //     You should remove/add/adjust comments in your file as appropriate
 //     to represent your work and any changes you make.
 //   </para>
+// <authors> Pridhvi Subgani </authors>
+// <date> September 10, 2026 </date>
 // </summary>
 
 using System.Reflection;
@@ -51,7 +53,9 @@ public class Formula
     ///   represents valid variable name strings.
     /// </summary>
     private const string VariableRegExPattern = @"[a-zA-Z]+\d+";
+    //holds the standardized form of the infix expression
     private string StandardizedForm;
+
     /// <summary>
     ///   Initializes a new instance of the <see cref="Formula"/> class.
     ///   <para>
@@ -88,12 +92,13 @@ public class Formula
         {
             throw new FormulaFormatException("formula must have at least one token");
         }
+        
         //RULE 5 - first token must be number, variable, or opening parenthesis
-        if (!validFollowingToken(tokens[0], "("))
+        if (!validFollowingTokenRules567(tokens[0], "("))
             throw new FormulaFormatException("first token must be number, variable, or opening parenthesis");
         
         //RULE 6 - last token must be number, variable, or closing parenthesis
-        if (!validFollowingToken(tokens[tokens.Count - 1], ")"))
+        if (!validFollowingTokenRules567(tokens[tokens.Count - 1], ")"))
             throw new FormulaFormatException("last token must be number, variable, or closing parenthesis");
 
         int openParenthesisCount = 0;
@@ -101,11 +106,11 @@ public class Formula
         
         for (int i = 0; i < tokens.Count; i++)
         {
-            if (double.TryParse(tokens[i], out double x) == true || IsVar(tokens[i])) //if token is a number or variable
+            if (double.TryParse(tokens[i], out double x) == true || IsVar(tokens[i])) // check if token is a number or variable
             {
                 if (i + 1 < tokens.Count)
                 {
-                    if (validFollowingToken2(tokens[i + 1]) == false)
+                    if (validFollowingTokenRule8(tokens[i + 1]) == false)
                     {
                         throw new FormulaFormatException("following an operator must be a number, variable, or open parenthesis");
                     }
@@ -118,24 +123,24 @@ public class Formula
                 case "(":
                     openParenthesisCount++;
                     // RULE 7a - parenthesis following rule  
-                    if (i + 1 >= tokens.Count || validFollowingToken(tokens[i + 1], "(") == false) // check that token after ( is out of range or is invalid
-                {
-                    throw new FormulaFormatException(
-                        "following an open parenthesis must be a number, variable, or open parenthesis");
-                }
+                    if (i + 1 >= tokens.Count || validFollowingTokenRules567(tokens[i + 1], "(") == false) // check that the token after "(" is out of range or is invalid
+                    {
+                        throw new FormulaFormatException(
+                            "following an open parenthesis must be a number, variable, or open parenthesis");
+                    }
                     break;
                 case ")":
                     closingParenthesisCount++;
-                    if (i + 1 < tokens.Count) // check that a token after )
+                    if (i + 1 < tokens.Count) // check if a token after ")" exists
                     {
-                        if (validFollowingToken2(tokens[i + 1]) == false) // check that this token is invalid
-                        throw new FormulaFormatException(
-                            "following a closed parenthesis must be an operator or closing parenthesis");
+                        if (validFollowingTokenRule8(tokens[i + 1]) == false) // check that this token is invalid
+                            throw new FormulaFormatException(
+                                "following a closed parenthesis must be an operator or closing parenthesis");
                     }
                     break;
                 case "+": case "-": case "/": case "*":
                     // RULE 7b - operator following rule
-                    if (i + 1 >= tokens.Count || validFollowingToken(tokens[i + 1], "(") == false) // check that token after operator is out of range or is invalid
+                    if (i + 1 >= tokens.Count || validFollowingTokenRules567(tokens[i + 1], "(") == false) // check that token after operator is out of range or is invalid
                     {
                         throw new FormulaFormatException(
                             "following an operator must be a number, variable, or open parenthesis");
@@ -148,7 +153,6 @@ public class Formula
             {
                 throw new FormulaFormatException("closing parenthesis found before opening parenthesis");
             }
-
         }
         
         //RULE 4 - balanced parentheses
@@ -157,8 +161,8 @@ public class Formula
             throw new FormulaFormatException("parentheses count mismatch");
         }
 
+        //create the expected canonical form of the formula parameter
         StandardizedForm = canonize(formula);
-
     }
 
     /// <summary>
@@ -188,9 +192,7 @@ public class Formula
             {
                 variables.Add(token);
             }
-
         }
-        
         return variables;
     }
 
@@ -299,12 +301,15 @@ public class Formula
     }
 
     /// <summary>
-    /// Checks if the token is valid for Rules 5, 6, and 7 (i.e. a number, variable, or open parenthesis/closing parenthesis depending on arguments)
+    /// Checks if the following token is valid for Rules 5, 6, and 7:
+    /// The first token of an expression must be a number, a variable, or an opening parenthesis.
+    /// The last token of an expression must be a number, a variable, or a closing parenthesis.
+    /// Any token that immediately follows an opening parenthesis or an operator must be either a number, a variable, or an opening parenthesis.
     /// </summary>
     /// <param name="token">token to be validated</param>
-    /// <param name="paren">opening or closing parenthesis to be expected from the token</param>
-    /// <returns>true if token is valid, false if token is invalid (i.e. token cannot follow an open parenthesis)</returns>
-    private static bool validFollowingToken(string token, string paren)
+    /// <param name="paren">opening or closing parenthesis to be expected</param>
+    /// <returns>true if following token is valid, false if following token is invalid (i.e. certain token cannot follow an open parenthesis)</returns>
+    private static bool validFollowingTokenRules567(string token, string paren)
     {
         // if token is not a variable or a number or parenthesis, return false
         if (!IsVar(token) && double.TryParse(token, out double x) == false && token != paren)
@@ -312,7 +317,14 @@ public class Formula
         return true;
     }
 
-    private static bool validFollowingToken2(string token)
+    /// <summary>
+    /// Checks if the following token is valid for Rule 8:
+    /// Any token that immediately follows a number, a variable,
+    /// or a closing parenthesis must be either an operator or a closing parenthesis.
+    /// </summary>
+    /// <param name="token"></param>
+    /// <returns></returns>
+    private static bool validFollowingTokenRule8(string token)
     {
         //Any token that immediately follows a number, a variable, or a closing parenthesis must be either an operator or a closing parenthesis.
         string[] validTokens = { ")", "+", "-", "*", "/" };
@@ -324,7 +336,11 @@ public class Formula
         return false;
     }
     
-    //returns a string of the canonized form of the formula/input
+    /// <summary>
+    /// Helper method to canonize the given infix expression
+    /// </summary>
+    /// <param name="input">string input to be canonizedd</param>
+    /// <returns>returns the canonized form of the input string</returns>
     private String canonize(string input)
     { 
         List<string> tokens = GetTokens(input);
@@ -354,7 +370,7 @@ public class Formula
 }
 
 
-    /// <summary>
+/// <summary>
 ///   Used to report syntax errors in the argument to the Formula constructor.
 /// </summary>
 public class FormulaFormatException : Exception

@@ -366,14 +366,51 @@ public class FormulaSyntaxTests {
     }
     
     [TestMethod]
+    public void Formula_TestToStringAlreadyCanonized_Valid() {
+        Formula f = new Formula("A1+11*B13/12");
+        Assert.AreEqual("A1+11*B13/12", f.ToString());
+    }
+    
+    [TestMethod]
+    public void Formula_TestToStringHeavyWhitespace_Valid() {
+        Formula f = new Formula("       A1       +   11 *          B13    /  12       ");
+        Assert.AreEqual("A1+11*B13/12", f.ToString());
+    }
+    
+    [TestMethod]
+    public void Formula_TestToStringDifferentNumberFormats_Valid() {
+        Formula f = new Formula("x1 + 1.2e3 * 11E5 - 12e0/2.000");
+        Assert.AreEqual("X1+1200*1100000-12/2", f.ToString());
+    }
+
+    
+    [TestMethod]
     public void Formula_TestToString_Valid() {
         Formula f = new Formula("11.2e3 + a11 * X2 - 1.10/12 + (E2)");
         Assert.AreEqual("11200+A11*X2-1.1/12+(E2)", f.ToString());
     }
+   
+        [TestMethod] public void Formula_TestGetVariables_Valid() {
+            Formula test = new Formula("a1 - 11 * b2 + b33 / c100");
+            ISet<string> testHash = test.GetVariables();
+            
+            ISet<string> expected = new HashSet<string>();
+            expected.Add("A1");
+            expected.Add("B2");
+            expected.Add("B33");
+            expected.Add("C100");
+            
+            Assert.AreEqual(expected.Count,  testHash.Count);
+            Assert.AreEqual(true,  testHash.Contains("A1"));
+            Assert.AreEqual(true,  testHash.Contains("B2"));
+            Assert.AreEqual(true,  testHash.Contains("B33"));
+            Assert.AreEqual(true,  testHash.Contains("C100"));
+    
+        }
     
     [TestMethod]
-    public void Formula_TestGetVariables_Valid() {
-        Formula test = new Formula("a1 + A1 * a1 - 11 / 2e2 + E2");
+    public void Formula_TestGetVariablesDuplicates_Valid() {
+        Formula test = new Formula("a1 + A1 * a1 - 11 / 2e6 + E2");
         ISet<string> testHash = test.GetVariables();
         
         ISet<string> expected = new HashSet<string>();
@@ -384,6 +421,5 @@ public class FormulaSyntaxTests {
         Assert.AreEqual(true,  testHash.Contains("A1"));
         Assert.AreEqual(true,  testHash.Contains("E2"));
     }
-
     
 }
