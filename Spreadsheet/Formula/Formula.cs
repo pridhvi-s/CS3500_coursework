@@ -11,6 +11,8 @@
 //   </para>
 // </summary>
 
+using System.Reflection;
+
 namespace Formula;
 
 using System.Text.RegularExpressions;
@@ -49,7 +51,7 @@ public class Formula
     ///   represents valid variable name strings.
     /// </summary>
     private const string VariableRegExPattern = @"[a-zA-Z]+\d+";
-
+    private string StandardizedForm;
     /// <summary>
     ///   Initializes a new instance of the <see cref="Formula"/> class.
     ///   <para>
@@ -77,9 +79,86 @@ public class Formula
     ///   </list>
     /// </summary>
     /// <param name="formula"> The string representation of the formula to be created.</param>
-    public Formula( string formula )
+    public Formula(string formula)
     {
-        // FIXME: implement your code here
+        List<string> tokens = GetTokens(formula);
+        
+        //RULE 1 - there must be at least one token
+        if (tokens.Count == 0)
+        {
+            throw new FormulaFormatException("formula must have at least one token");
+        }
+        //RULE 5 - first token must be number, variable, or opening parenthesis
+        if (!validFollowingToken(tokens[0], "("))
+            throw new FormulaFormatException("first token must be number, variable, or opening parenthesis");
+        
+        //RULE 6 - last token must be number, variable, or closing parenthesis
+        if (!validFollowingToken(tokens[tokens.Count - 1], ")"))
+            throw new FormulaFormatException("last token must be number, variable, or closing parenthesis");
+
+        int openParenthesisCount = 0;
+        int closingParenthesisCount = 0;
+        
+        for (int i = 0; i < tokens.Count; i++)
+        {
+            if (double.TryParse(tokens[i], out double x) == true || IsVar(tokens[i])) //if token is a number or variable
+            {
+                if (i + 1 < tokens.Count)
+                {
+                    if (validFollowingToken2(tokens[i + 1]) == false)
+                    {
+                        throw new FormulaFormatException("following an operator must be a number, variable, or open parenthesis");
+                    }
+                }  
+                continue;
+            }
+
+            switch (tokens[i])
+            {
+                case "(":
+                    openParenthesisCount++;
+                    // RULE 7a - parenthesis following rule  
+                    if (i + 1 >= tokens.Count || validFollowingToken(tokens[i + 1], "(") == false) // check that token after ( is out of range or is invalid
+                {
+                    throw new FormulaFormatException(
+                        "following an open parenthesis must be a number, variable, or open parenthesis");
+                }
+                    break;
+                case ")":
+                    closingParenthesisCount++;
+                    if (i + 1 < tokens.Count) // check that a token after )
+                    {
+                        if (validFollowingToken2(tokens[i + 1]) == false) // check that this token is invalid
+                        throw new FormulaFormatException(
+                            "following a closed parenthesis must be an operator or closing parenthesis");
+                    }
+                    break;
+                case "+": case "-": case "/": case "*":
+                    // RULE 7b - operator following rule
+                    if (i + 1 >= tokens.Count || validFollowingToken(tokens[i + 1], "(") == false) // check that token after operator is out of range or is invalid
+                    {
+                        throw new FormulaFormatException(
+                            "following an operator must be a number, variable, or open parenthesis");
+                    }
+                    break;
+            }
+            
+            //RULE 3 - # of closing parentheses cannot be greater than the # of opening parentheses seen so far
+            if (closingParenthesisCount > openParenthesisCount)
+            {
+                throw new FormulaFormatException("closing parenthesis found before opening parenthesis");
+            }
+
+        }
+        
+        //RULE 4 - balanced parentheses
+        if (openParenthesisCount != closingParenthesisCount)
+        {
+            throw new FormulaFormatException("parentheses count mismatch");
+        }
+
+        StandardizedForm = canonize(formula);
+
     }
 
     /// <summary>
@@ -98,10 +177,21 @@ public class Formula
     ///   </list>
     /// </summary>
     /// <returns> the set of variables (string names) representing the variables referenced by the formula. </returns>
-    public ISet<string> GetVariables( )
+    public ISet<string> GetVariables()
     {
-        // FIXME: implement your code here
-        return new HashSet<string>();
+        HashSet<string> variables = new HashSet<string>();
+        List<string> tokens = GetTokens(StandardizedForm);
+        
+        foreach (string token in tokens)
+        {
+            if (IsVar(token))
+            {
+                variables.Add(token);
+            }
+
+        }
+        
+        return variables;
     }
 
     /// <summary>
@@ -137,10 +227,9 @@ public class Formula
     ///   A canonical version (string) of the formula. All "equal" formulas
     ///   should have the same value here.
     /// </returns>
-    public override string ToString( )
+    public override string ToString()
     {
-        // FIXME: add your code here.
-        return string.Empty;
+        return string.Concat(GetTokens(StandardizedForm));
     }
 
     /// <summary>
@@ -208,10 +297,64 @@ public class Formula
 
         return results;
     }
+
+    /// <summary>
+    /// Checks if the token is valid for Rules 5, 6, and 7 (i.e. a number, variable, or open parenthesis/closing parenthesis depending on arguments)
+    /// </summary>
+    /// <param name="token">token to be validated</param>
+    /// <param name="paren">opening or closing parenthesis to be expected from the token</param>
+    /// <returns>true if token is valid, false if token is invalid (i.e. token cannot follow an open parenthesis)</returns>
+    private static bool validFollowingToken(string token, string paren)
+    {
+        // if token is not a variable or a number or parenthesis, return false
+        if (!IsVar(token) && double.TryParse(token, out double x) == false && token != paren)
+            return false;
+        return true;
+    }
+
+    private static bool validFollowingToken2(string token)
+    {
+        //Any token that immediately follows a number, a variable, or a closing parenthesis must be either an operator or a closing parenthesis.
+        string[] validTokens = { ")", "+", "-", "*", "/" };
+        foreach (string validToken in validTokens)
+        {
+            if (token == validToken)
+                return true;
+        }
+        return false;
+    }
+    
+    //returns a string of the canonized form of the formula/input
+    private String canonize(string input)
+    { 
+        List<string> tokens = GetTokens(input);
+        string ret = string.Empty;
+        
+        foreach (string token in tokens)
+        {
+            if (double.TryParse(token, out double x) == true)
+            {
+                ret += double.Parse(token).ToString();
+                continue;
+            }
+
+            if (IsVar(token))
+            {
+                ret += token.ToUpper();
+                continue;
+            }
+
+            ret += token;
+
+        }
+        return ret;
+    }
+
+    
 }
 
 
-/// <summary>
+    /// <summary>
 ///   Used to report syntax errors in the argument to the Formula constructor.
 /// </summary>
 public class FormulaFormatException : Exception
