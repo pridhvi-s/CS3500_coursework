@@ -118,7 +118,7 @@ public class DependencyGraph
         if (HasDependents(nodeName))
         return dependees[nodeName];
 
-        return null;
+        return new HashSet<string>();
     }
 
     /// <summary>
@@ -133,7 +133,7 @@ public class DependencyGraph
         if (HasDependees(nodeName))
             return dependents[nodeName];
 
-        return null;
+        return new HashSet<string>();
     }
 
     /// <summary>

@@ -115,6 +115,14 @@ public class DependencyGraphTests
     }
     
     [TestMethod]
+    public void DependencyGraph_AddDependentIsDependee()
+    {
+        DependencyGraph dg = new();
+        dg.AddDependency("a1", "a1");
+        Assert.AreEqual(1, dg.Size);
+    }
+    
+    [TestMethod]
     public void DependencyGraph_AddCyclical()
     {
         DependencyGraph dg = new();
@@ -202,19 +210,9 @@ public class DependencyGraphTests
         DependencyGraph dg = new();
         dg.AddDependency("a1", "b1");
         dg.AddDependency("a1", "b2");
-        dg.AddDependency("a1", "b3");
-        dg.AddDependency("a1", "b4");
 
-        String[] expected = { "b1","b2","b3","b4" };
-        
-        int i = 0;
-        dg.GetDependents("a2");
-
-/*        foreach (string str in dg.GetDependents("a1"))
-        {
-            Assert.AreEqual(expected[i], str, "failed at " + i);
-            i++;
-        }*/
+        Assert.IsEmpty(dg.GetDependents("c1"));
+        Assert.IsEmpty(dg.GetDependents("b1"));
     }
     
     [TestMethod]
@@ -238,7 +236,18 @@ public class DependencyGraphTests
     }
     
     [TestMethod]
-    public void DependencyGraph_ReplaceDependents()
+    public void DependencyGraph_GetDependees_Invalid()
+    {
+        DependencyGraph dg = new();
+        dg.AddDependency("a1", "b1");
+        dg.AddDependency("a1", "b2");
+        
+        Assert.IsEmpty(dg.GetDependees("a3"));
+        Assert.IsEmpty(dg.GetDependees("a1"));
+    }
+    
+    [TestMethod]
+    public void DependencyGraph_ReplaceDependents_ValidNode()
     {
         DependencyGraph dg = new();
         dg.AddDependency("a1", "b1");
@@ -249,13 +258,11 @@ public class DependencyGraphTests
         HashSet<string> newDependents = new HashSet<string>();
         newDependents.Add("c1");
         newDependents.Add("c2");
-        newDependents.Add("c3");
-        newDependents.Add("c4");
 
         dg.ReplaceDependents("a1", newDependents);
-        Assert.AreEqual(4, dg.Size);
+        Assert.AreEqual(2, dg.Size);
         
-        int i = 4;
+        int i = 2;
 
         foreach (string str in dg.GetDependents("a1"))
         {
@@ -265,30 +272,67 @@ public class DependencyGraphTests
     }
     
     [TestMethod]
-    public void DependencyGraph_ReplaceDependees()
+    public void DependencyGraph_ReplaceDependents_InvalidNode()
+    {
+        DependencyGraph dg = new();
+        dg.AddDependency("a1", "b1");
+        dg.AddDependency("a1", "b2");
+        
+        HashSet<string> newDependents = new HashSet<string>();
+        newDependents.Add("c1");
+        newDependents.Add("c2");
+        
+        //replace method should 1: remove all existing ordered pairs (nodeName, *)
+        //and 2: add all ordered pairs (nodeName, newDependents)
+        
+        //since the given nodeName is not a valid one, step 1 will be skipped, and step 2 will be executed
+        dg.ReplaceDependents("a2", newDependents);
+        Assert.AreEqual(4, dg.Size);
+    }
+    
+    [TestMethod]
+    public void DependencyGraph_ReplaceDependees_ValidNode()
     {
         DependencyGraph dg = new();
         dg.AddDependency("a1", "b1");
         dg.AddDependency("a2", "b1");
         dg.AddDependency("a3", "b1");
         dg.AddDependency("a4", "b1");
-
+        
         HashSet<string> newDependees = new HashSet<string>();
         newDependees.Add("c1");
         newDependees.Add("c2");
-        newDependees.Add("c3");
-        newDependees.Add("c4");
 
         dg.ReplaceDependees("b1", newDependees);
-        Assert.AreEqual(4, dg.Size);
+        Assert.AreEqual(2, dg.Size);
         
-        int i = 4;
+        int i = 2;
 
-        foreach (string str in dg.GetDependees("b1"))
+        foreach (string str in dg.GetDependees("a1"))
         {
             Assert.AreEqual("c" + i, str, "failed at " + i);
             i--;
         }
+    }
+
+    
+    [TestMethod]
+    public void DependencyGraph_ReplaceDependees_InvalidNode()
+    {
+        DependencyGraph dg = new();
+        dg.AddDependency("a1", "b1");
+        dg.AddDependency("a2", "b1");
+
+        HashSet<string> newDependees = new HashSet<string>();
+        newDependees.Add("c1");
+        newDependees.Add("c2");
+
+        //replace method should 1: remove all existing ordered pairs (*, nodeName)
+        //and 2: add all ordered pairs (newDependees, nodeName)
+        
+        //since the given nodeName is not a valid one, step 1 will be skipped, and step 2 will be executed
+        dg.ReplaceDependees("d1", newDependees);
+        Assert.AreEqual(4, dg.Size);
     }
 
 
