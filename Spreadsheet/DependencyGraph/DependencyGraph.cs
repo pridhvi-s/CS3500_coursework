@@ -185,13 +185,18 @@ public class DependencyGraph
         if (dependees.ContainsKey(dependee))
         {
             if (dependees[dependee].Contains(dependent))
-                dependees[dependee].Remove(dependent); 
+                dependees[dependee].Remove(dependent);
+            if (dependees[dependee].Count == 0)
+                dependees.Remove(dependee);
         }
 
         if (dependents.ContainsKey(dependent))
         {
             if (dependents[dependent].Contains(dependee))
                 dependents[dependent].Remove(dependee);
+            if (dependents[dependent].Count == 0)
+                dependents.Remove(dependent);
+
         }
     }
 
