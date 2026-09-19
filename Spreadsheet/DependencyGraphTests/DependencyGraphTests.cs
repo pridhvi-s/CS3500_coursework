@@ -13,13 +13,12 @@ using DependencyGraph;
 public class DependencyGraphTests
 {
     /// <summary>
-    /// This stress test will create a graph of 200 dependencies, adds and removes multiple times
-    /// and checks that the result is to be expected each step of the way. It also ensures that the
-    /// methods do not timeout.
+    /// This stress test will first create a graph of nearly 20,000 dependencies, then mass add and mass remove multiple times
+    /// and checks that the final result is to be expected. It also ensures that no methods timeout.
     /// </summary>
     [TestMethod]
     [Timeout(2000, CooperativeCancellation = true)] // 2 second run time limit
-    public void StressTest()
+    public void StressTest_AddAndRemove()
     {
         // create the DG
         DependencyGraph dg = new();
@@ -33,7 +32,7 @@ public class DependencyGraphTests
         }
 
         // The correct answers
-        // creating empty dependents/dependees HashSets
+        // creating empty dependents/dependees HashSets. These will be used as the expected values.
         HashSet<string>[] dependents = new HashSet<string>[size];
         HashSet<string>[] dependees = new HashSet<string>[size];
         for (int i = 0; i < size; i++)
@@ -52,7 +51,7 @@ public class DependencyGraphTests
                 dependees[j].Add(letters[i]);
             }
         }
-
+        
         // Remove a bunch of these dependencies
         for (int i = 0; i < size; i++)
         {
@@ -93,6 +92,139 @@ public class DependencyGraphTests
                 "first assert failed at " + i);
             Assert.IsTrue(dependees[i].SetEquals(new HashSet<string>(dg.GetDependees(letters[i]))),
                 "second assert failed at " + i);
+        }
+    }
+
+    /// <summary>
+    /// This stress test will first create a graph of nearly 600 dependencies.
+    /// Then it will replace dependents on half of the dependencies,
+    /// and then replace dependees on the other half of the dependencies.
+    /// At each replace, it will ensure that the Has and Get methods are returning correctly -- effectively
+    /// checking each method.
+    /// </summary>
+
+    [TestMethod]
+    [Timeout(2000, CooperativeCancellation = true)] // 2 second run time limit
+    public void StressTest_ReplaceAndQuery()
+    {
+        DependencyGraph dg = new();
+
+        const int size = 200;
+        string[] letters = new string[size];
+        for (int i = 0; i < size; i++)
+            letters[i] = string.Empty + ((char)('a' + i));
+
+        // Create the expected HashSet
+        HashSet<string>[] dependents = new HashSet<string>[size];
+        HashSet<string>[] dependees = new HashSet<string>[size];
+        for (int i = 0; i < size; i++)
+        {
+            dependents[i] = [];
+            dependees[i] = [];
+        }
+
+        for (int i = 0; i < size; i++)
+        {
+            for (int j = i + 1; j < size && j <= i + 3; j++)
+            {
+                // create dependencies where dependee = x and dependent = x + 1, x + 2, x + 3
+                dg.AddDependency(letters[i], letters[j]);
+                dependents[i].Add(letters[j]);
+                dependees[j].Add(letters[i]);
+            }
+        }
+        
+        for (int i = 0; i < size; i++)
+        {
+            Assert.AreEqual(dependents[i].Count != 0, dg.HasDependents(letters[i]),
+                "Part 1 HasDependents failed at " + i);
+            Assert.AreEqual(dependees[i].Count != 0, dg.HasDependees(letters[i]),
+                "Part 1 HasDependees failed at " + i);
+
+            Assert.IsTrue(dependents[i].SetEquals(new HashSet<string>(dg.GetDependents(letters[i]))),
+                "Part 1 GetDependents failed at " + i);
+            Assert.IsTrue(dependees[i].SetEquals(new HashSet<string>(dg.GetDependees(letters[i]))),
+                "Part 1 GetDependees failed at " + i);
+        }
+        
+        // ReplaceDependents on every even index node
+        // the new dependents will be the two preceding nodes of the dependee
+
+        for (int i = 0; i < size; i += 2)
+        {
+            HashSet<string> newDeps = [];
+            if (i - 1 >= 0) newDeps.Add(letters[i - 1]);
+            if (i - 2 >= 0) newDeps.Add(letters[i - 2]);
+
+            // unlink every old pair from dependees
+            foreach (string old in dependents[i])
+            {
+                int oldIdx = Array.IndexOf(letters, old);
+                dependees[oldIdx].Remove(letters[i]);
+            }
+
+            // now place new dependents and execute replace
+            dependents[i] = new HashSet<string>(newDeps);
+            foreach (string nd in newDeps)
+            {
+                int ndIdx = Array.IndexOf(letters, nd);
+                dependees[ndIdx].Add(letters[i]);
+            }
+
+            dg.ReplaceDependents(letters[i], newDeps);
+        }
+
+        for (int i = 0; i < size; i++)
+        {
+            Assert.AreEqual(dependents[i].Count != 0, dg.HasDependents(letters[i]),
+                "Part 2 HasDependents failed at " + i);
+            Assert.AreEqual(dependees[i].Count != 0, dg.HasDependees(letters[i]),
+                "Part 2 HasDependees failed at " + i);
+
+            Assert.IsTrue(dependents[i].SetEquals(new HashSet<string>(dg.GetDependents(letters[i]))),
+                "Part 2 GetDependents failed at " + i);
+            Assert.IsTrue(dependees[i].SetEquals(new HashSet<string>(dg.GetDependees(letters[i]))),
+                "Part 2 GetDependees failed at " + i);
+        }
+
+        // ReplaceDependees on every odd index node
+        // the new dependees will be the two following nodes of the dependent
+
+        for (int i = 1; i < size; i += 2)
+        {
+            HashSet<string> newDees = [];
+            if (i + 1 < size) newDees.Add(letters[i + 1]);
+            if (i + 2 < size) newDees.Add(letters[i + 2]);
+
+            // unlink every old pair from dependents
+            foreach (string old in dependees[i])
+            {
+                int oldIdx = Array.IndexOf(letters, old);
+                dependents[oldIdx].Remove(letters[i]);
+            }
+
+            // now place new dependees and execute replace
+            dependees[i] = new HashSet<string>(newDees);
+            foreach (string nd in newDees)
+            {
+                int ndIdx = Array.IndexOf(letters, nd);
+                dependents[ndIdx].Add(letters[i]);
+            }
+
+            dg.ReplaceDependees(letters[i], newDees);
+        }
+
+        for (int i = 0; i < size; i++)
+        {
+            Assert.AreEqual(dependents[i].Count != 0, dg.HasDependents(letters[i]),
+                "Part 3 HasDependents failed at " + i);
+            Assert.AreEqual(dependees[i].Count != 0, dg.HasDependees(letters[i]),
+                "Part 3 HasDependees failed at " + i);
+
+            Assert.IsTrue(dependents[i].SetEquals(new HashSet<string>(dg.GetDependents(letters[i]))),
+                "Part 3 GetDependents failed at " + i);
+            Assert.IsTrue(dependees[i].SetEquals(new HashSet<string>(dg.GetDependees(letters[i]))),
+                "Part 3 GetDependees failed at " + i);
         }
     }
 
