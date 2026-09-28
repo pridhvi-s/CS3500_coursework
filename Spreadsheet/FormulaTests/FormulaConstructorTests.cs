@@ -419,7 +419,451 @@ public class FormulaSyntaxTests {
         
         Assert.AreEqual(expected.Count,  testHash.Count);
         Assert.AreEqual(true,  testHash.Contains("A1"));
-        Assert.AreEqual(true,  testHash.Contains("E2"));
+        Assert.AreEqual(true,  testHash.Contains("E2"))       ;
     }
     
+    // --- Tests for Equals method and equality operators
+
+    [TestMethod]
+    public void Formula_TestEqualsDifferentFormat_True()
+    {
+        Formula f = new Formula("    12.00 + A3/  5 * E2 - 12E6 ");
+        Formula g = new Formula("12+A3/5*e2-12e6");
+        
+        Assert.IsTrue(f.Equals(g));
+        Assert.IsTrue(f==g);
+        Assert.IsFalse(f!=g);
+    }
+    
+    [TestMethod]
+    public void Formula_TestEqualsSameFormula_True()
+    {
+        Formula g = new Formula("12+A3/10*E7");
+        
+        Assert.IsTrue(g.Equals(g));
+        Assert.IsTrue(g==g);
+        Assert.IsFalse(g!=g);
+    }
+    
+    [TestMethod]
+    public void Formula_TestEqualsDiffFormula_False()
+    {
+        Formula f = new Formula("12+A3/10*E11");
+        Formula g = new Formula("12+A3/10*E7");
+        
+        Assert.IsFalse(f.Equals(g));
+        Assert.IsFalse(f==g);
+        Assert.IsTrue(f!=g);
+    }
+    
+    [TestMethod]
+    public void Formula_TestEqualsFormulaToNull_False()
+    {
+        Formula f = new Formula("12+A3/10*E11");
+        
+        Assert.IsFalse(f.Equals(null));
+        Assert.IsFalse(f==null);
+        Assert.IsTrue(f!=null);
+    }
+    
+    [TestMethod]
+    public void Formula_TestEqualsFormulaToDifferentObject_False()
+    {
+        Formula f = new Formula("12+A3/10*E11");
+        string str = "12+A3/10*E11";
+        Assert.IsFalse(f.Equals(str));
+    }
+    
+    [TestMethod]
+    public void Formula_TestEqualsMethod_Symmetric()
+    {
+        Formula f = new Formula("A1+B1");
+        Formula g = new Formula("a1+b1");
+        
+        Assert.IsTrue(f.Equals(g));
+        Assert.IsTrue(f==g);
+        Assert.IsFalse(f!=g);
+        
+        Assert.IsTrue(g.Equals(f));
+        Assert.IsTrue(g==f);
+        Assert.IsFalse(g!=f);
+    }
+    
+    [TestMethod]
+    public void EqualsMethod_Transitive()
+    {
+        Formula f = new Formula("   A1 + 1.0e0 ");
+        Formula g = new Formula("A1+1");
+        Formula h = new Formula("a1+1E0");
+        
+        Assert.IsTrue(f.Equals(g));
+        Assert.IsTrue(f==g);
+        Assert.IsFalse(f!=g);
+        
+        Assert.IsTrue(g.Equals(h));
+        Assert.IsTrue(g==h);
+        Assert.IsFalse(g!=h);
+        
+        Assert.IsTrue(f.Equals(h));
+        Assert.IsTrue(f==h);
+        Assert.IsFalse(f!=h);
+    }
+    
+    
+    [TestMethod]
+    public void TestEqualsMethod_DifferentOrder_NotEqual()
+    {
+        Formula f = new Formula("A1+B1");
+        Formula g = new Formula("B1+A1");
+        Assert.IsFalse(f.Equals(g));
+        Assert.IsFalse(f == g);
+        Assert.IsTrue(f != g);
+    }
+    
+    [TestMethod]
+    public void EqualityOperator_NonNullEqualsNull_False()
+    {
+        Formula f = new Formula("1+1");
+        Assert.IsFalse(f == null);
+        Assert.IsTrue(f != null);
+    }
+
+    
+    // --- Tests for Evaluate method
+    
+    //create a spreadsheet of a few cell values
+    private static double Spreadsheet(string t) {
+        switch (t)
+        {
+            case "A1":
+            case "a1":
+                return 2;
+            case "B1":
+            case "b1":
+                return 3;
+            case "C1":
+            case "c1":
+                return 4;
+            case "D1":
+            case "d1":
+                return 8;
+        }
+        throw new Exception("variable DNE");
+    }
+    
+    //create a second spreadsheet of a few cell values
+    private static double Spreadsheet2(string t) =>
+        t.ToUpper() switch
+        {
+            "A1" => 2,
+            "B1" => 3,
+            "C1" => 4,
+            "D1" => 8,
+            "A2" => 0,
+            "B2" => 6,
+            "C2" => 12,
+            _    => throw new ArgumentException($"variable {t} DNE")
+        };
+
+    
+    [TestMethod]
+    public void EvaluateMethod_TestSimpleAddition_Valid()
+    {
+        Formula f = new Formula("2+2.0");
+        Assert.AreEqual(4.0, f.Evaluate(_ => 0));
+    }
+    
+    [TestMethod]
+    public void EvaluateMethod_TestSimpleSubtraction_Valid()
+    {
+        Formula f = new Formula("2e2 - 1e2");
+        Assert.AreEqual(100.0, f.Evaluate(_ => 0));
+    }
+    
+    [TestMethod]
+    public void EvaluateMethod_TestSimpleMultiplication_Valid()
+    {
+        Formula f = new Formula("  2*    5");
+        Assert.AreEqual(10.0, f.Evaluate(_ => 0));
+    }
+    
+    [TestMethod]
+    public void EvaluateMethod_TestSimpleDivision_Valid()
+    {
+        Formula f = new Formula("9/3");
+        Assert.AreEqual(3.0, f.Evaluate(_ => 0));
+    }
+    
+    [TestMethod]
+    public void EvaluateMethod_TestSimpleDivisionIrrational_Valid()
+    {
+        Formula f = new Formula("3/9");
+        Assert.AreEqual(3/9.0, f.Evaluate(_ => 0));
+    }
+    
+    [TestMethod]
+    public void EvaluateMethod_TestZeroDividedByNumber_Valid()
+    {
+        Formula f = new Formula("0/11");
+        Assert.AreEqual(0.0, f.Evaluate(_ => 0));
+    }
+    
+    [TestMethod]
+    public void EvaluateMethod_TestNumberDividedByZero_Invalid()
+    {
+        Formula f = new Formula("11/0");
+        Assert.IsInstanceOfType(f.Evaluate(_ => 0), typeof(FormulaError));
+    }
+    
+    [TestMethod]
+    public void EvaluateMethod_DivisionByZeroNotShortCircuited_Invalid()
+    {
+        Formula f = new Formula("1/0+1/0");
+        Assert.IsInstanceOfType(f.Evaluate(_ => 0), typeof(FormulaError));
+    }
+
+    
+    [TestMethod]
+    public void EvaluateMethod_TestSimpleParenthesesExpression_Valid()
+    {
+        Formula f = new Formula("( 10 - 12 + 4)  ");
+        Assert.AreEqual(2.0, f.Evaluate(_ => 0));
+    }
+    
+    [TestMethod]
+    public void EvaluateMethod_TestParenthesesExpressionPEMDAS_Valid()
+    {
+        Formula f = new Formula("( 10 / 5 - 12 + 2 - 4  * 2 / 4)  ");
+        Assert.AreEqual(-10.0, f.Evaluate(_ => 0));
+    }
+    
+    [TestMethod]
+    public void EvaluateMethod_TestMultipleParentheses_Valid()
+    {
+        Formula f = new Formula("(10+2)*4/(8-2)");
+        Assert.AreEqual(8.0, f.Evaluate(_ => 0));
+    }
+
+    [TestMethod]
+    public void EvaluateMethod_TestEvaluateSumOfProducts_Valid()
+    {
+        Formula f = new Formula("(10*2)-(10*2)+(10*2)");
+        Assert.AreEqual(20.0, f.Evaluate(_ => 0));
+    }
+
+    [TestMethod]
+    public void EvaluateMethod_TestEvaluateSumOfQuotients_Valid()
+    {
+        Formula f = new Formula("(10/2)-(10/2)+(10/2)");
+        Assert.AreEqual(5.0, f.Evaluate(_ => 0));
+    }
+    
+    [TestMethod]
+    public void EvaluateMethod_TestEvaluateProductOfSums_Valid()
+    {
+        Formula f = new Formula("(4+6)*(11-3)/(15+5)");
+        Assert.AreEqual(4.0, f.Evaluate(_ => 0));
+    }
+    
+    [TestMethod]
+    public void EvaluateMethod_TestEvaluateSimpleVariableStatement_Valid()
+    {
+        Formula f = new Formula("A1+11");
+        Assert.AreEqual(15.0, f.Evaluate(_ => 4));
+    }
+    
+    [TestMethod]
+    public void EvaluateMethod_TestEvaluateVariableStatement_Valid()
+    {
+        Formula f = new Formula("((A1+11)/3)*A1");
+        Assert.AreEqual(20.0, f.Evaluate(_ => 4));
+    }
+    
+    [TestMethod]
+    public void EvaluateMethod_TestEvaluateVariableDivideByZero_Invalid()
+    {
+        Formula f = new Formula("1/A3");
+        Assert.IsInstanceOfType(f.Evaluate(_ => 0), typeof(FormulaError));
+    }
+    
+    [TestMethod]
+    public void EvaluateMethod_DivisionByVariable_Valid()
+    {
+        Formula f = new Formula("10/X1");
+        Assert.AreEqual(5.0, f.Evaluate(_ => 2));
+    }
+    
+    [TestMethod]
+    public void EvaluateMethod_TestEvaluateMultipleVariables_Valid()
+    {
+        Formula f = new Formula("(A1+b1)*2");
+        Assert.AreEqual(10.0, f.Evaluate(Spreadsheet));
+    }
+    
+    [TestMethod]
+    public void EvaluateMethod_DivisionByZeroExpression_Invalid()
+    {
+        Formula f = new Formula("6/(B2-1)");
+        Assert.IsInstanceOfType(f.Evaluate(_ => 1), typeof(FormulaError));
+    }
+    
+    [TestMethod]
+    public void EvaluateMethod_TestEvaluateUndefinedVariable_Invalid()
+    {
+        Formula f = new Formula("X1+5");
+        Assert.IsInstanceOfType(f.Evaluate(_ => throw new ArgumentException("variableDNE")),
+            typeof(FormulaError));
+    }
+    
+        [TestMethod]
+        public void EvaluateMethod_VariableNormalisedBeforeLookup()
+        {
+            Formula f = new Formula("a1+b1");
+            Assert.AreEqual(5.0, f.Evaluate(Spreadsheet2));
+        }
+    
+        [TestMethod]
+        public void EvaluateMethod_SameVariableUsedTwice()
+        {
+            Formula f = new Formula("2*A1+A1");
+            Assert.AreEqual(6.0, f.Evaluate(Spreadsheet2));
+        }
+    
+        [TestMethod]
+        public void EvaluateMethod_AllFourOperatorsWithVariables()
+        {
+            Formula f = new Formula("A1+B1*C1-D1/A1");
+            Assert.AreEqual(10.0, f.Evaluate(Spreadsheet2));
+        }
+    
+        [TestMethod]
+        public void EvaluateMethod_ComplexExpressionWithVariables()
+        {
+            Formula f = new Formula("(A1+B1)*(C1-A1)");
+            Assert.AreEqual(10.0, f.Evaluate(Spreadsheet2));
+        }
+    
+        [TestMethod]
+        public void EvaluateMethod_VariableInDenominator_Valid()
+        {
+            Formula f = new Formula("D1/C1");
+            Assert.AreEqual(2.0, f.Evaluate(Spreadsheet2));
+        }
+    
+    [TestMethod]
+    public void EvaluateMethod_MultiplicationBeforeAddition_Valid()
+    {
+        Formula f = new Formula("2+3*4");
+        Assert.AreEqual(14.0, f.Evaluate(_ => 0));
+    }
+
+    [TestMethod]
+    public void EvaluateMethod_DivisionBeforeSubtraction_Valid()
+    {
+        Formula f = new Formula("20-8/4");
+        Assert.AreEqual(18.0, f.Evaluate(_ => 0));
+    }
+
+    [TestMethod]
+    public void EvaluateMethod_ParenthesesExemptPEMDAS_Valid()
+    {
+        Formula f = new Formula("1+2*3-4/2");
+        Assert.AreEqual(5.0, f.Evaluate(_ => 0));
+    }
+
+    [TestMethod]
+    public void EvaluateMethod_ParenthesesPrecedence_Valid()
+    {
+        Formula f = new Formula("(2+3)*4");
+        Assert.AreEqual(20.0, f.Evaluate(_ => 0));
+    }
+
+    [TestMethod]
+    public void EvaluateMethod_DeeplyNestedParentheses_Valid()
+    {
+        Formula f = new Formula("(((2+3))*((2*2)))");
+        Assert.AreEqual(20.0, f.Evaluate(_ => 0));
+    }
+
+    [TestMethod]
+    public void EvaluateMethod_ScientificNotation_Valid()
+    {
+        Formula f = new Formula("1e2+2e1");
+        Assert.AreEqual(120.0, f.Evaluate(_ => 0));
+    }
+
+    // --- Tests for HashCode method
+
+    [TestMethod]
+    public void GetHashCodeMethod_TestHashCodeSimpleEquivalent_Valid()
+    {
+        Formula f = new Formula("(1+2+3)");
+        Formula g = new Formula("(1+2+3)");
+        Assert.IsTrue(f.GetHashCode() == g.GetHashCode());
+    }
+
+    [TestMethod]
+    public void GetHashCodeMethod_TestHashCodeVariablesEquivalent_Valid()
+    {
+        Formula f = new Formula("A1");
+        Formula g = new Formula("a1");
+        Assert.IsTrue(f.GetHashCode() == g.GetHashCode());
+    }
+
+    [TestMethod]
+    public void GetHashCodeMethod_TestHashCodeEquivalentDiffFormat_Valid()
+    {
+        Formula f = new Formula("( 1.0 + 2e0 + 3E0 ) ");
+        Formula g = new Formula("(1+2+3)");
+        Assert.IsTrue(f.GetHashCode() == g.GetHashCode());
+    }
+
+
+    [TestMethod]
+    public void GetHashCodeMethod_TestHashCodeVariablesNotEquivalent_Valid()
+    {
+        Formula f = new Formula("A1");
+        Formula g = new Formula("B1");
+        Assert.IsFalse(f.GetHashCode() == g.GetHashCode());
+    }
+
+    [TestMethod]
+    public void GetHashCodeMethod_TestHashCodeComplexEquivalent_Valid()
+    {
+        Formula f = new Formula("a1 * 11e2 / (b1+b2) - C13 * (2.11-B2) + c11");
+        Formula g = new Formula("A1*1100/(B1+B2)-C13*(2.11-B2)+C11");
+        Assert.IsTrue(f.GetHashCode() == g.GetHashCode());
+    }
+    
+    [TestMethod]
+    public void GetHashCode_StableAcrossMultipleCalls()
+    {
+        Formula f = new Formula("A1*B1+C1");
+        int first  = f.GetHashCode();
+        int second = f.GetHashCode();
+        int third  = f.GetHashCode();
+        Assert.AreEqual(first, second);
+        Assert.AreEqual(second, third);
+    }
+    
+    [TestMethod]
+    public void GetHashCodeMethod_TestHashCodeComplexNotEquivalent_Valid()
+    {
+        //original formula f
+        Formula f = new Formula("a1 * 11e2 / (b1+b2) - C13 * (2.11-B2) + c11");
+        //equivalent form which will be changed for easier readability
+        Formula fEquivalent = new Formula("A1*1100/(B1+B2)-C13*(2.11-B2)+C11");
+        
+        Assert.IsTrue(f.GetHashCode() == fEquivalent.GetHashCode());
+        
+        Formula g = new Formula("A1*1100/(B1+B2)-C13*(2.11-B2)-C11"); // change + to -
+        Assert.IsFalse(f.GetHashCode() == g.GetHashCode());
+
+        Formula h = new Formula("A1*1100/(B1+B2)-C13*(2.11-B2)+C12"); // change c11 to c12
+        Assert.IsFalse(f.GetHashCode() == h.GetHashCode());
+
+        Formula i = new Formula("A1*1101/(B1+B2)-C13*(2.11-B2)+C11"); // change 1100 to 1101
+        Assert.IsFalse(f.GetHashCode() == i.GetHashCode(), "f " + f.GetHashCode() + " i " + i.GetHashCode());
+    }
+
 }
