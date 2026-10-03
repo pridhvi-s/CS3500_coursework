@@ -125,8 +125,11 @@ public class Spreadsheet
     {
         name = Normalize(name);
 
+        if (cells.TryGetValue(name, out Cell? cell))
+            return cell.Contents;
+        
         // Cells not in the dictionary are empty by definition.
-        return cells.TryGetValue(name, out Cell? cell) ? cell.Contents : string.Empty;
+        return string.Empty;
     }
 
     /// <summary>
