@@ -4,515 +4,525 @@
 
 namespace SpreadsheetTests;
 
-using Spreadsheets;
 using Formula;
+using Spreadsheets;
 
 [TestClass]
-public sealed class SpreadsheetTests
+public class SpreadsheetTests
 {
+    // ---------- constructor / basic state ----------
+
     [TestMethod]
-    public void NewSpreadsheet_HasNoNonemptyCells()
+    public void Constructor_Default_IsEmptyAndUnchanged()
     {
-        Spreadsheet s = new();
-        Assert.AreEqual(0, s.GetNamesOfAllNonemptyCells().Count);
+        Spreadsheet ss = new();
+        Assert.AreEqual(0, ss.GetNamesOfAllNonemptyCells().Count);
+        Assert.IsFalse(ss.Changed);
     }
 
     [TestMethod]
-    public void GetCellContents_NeverSetCell_ReturnsEmptyString()
+    public void GetCellContents_EmptyCell_ReturnsEmptyString()
     {
-        Spreadsheet s = new();
-        Assert.AreEqual(string.Empty, s.GetCellContents("A1"));
-        Assert.AreEqual(string.Empty, s.GetCellContents("zz99"));
+        Spreadsheet ss = new();
+        Assert.AreEqual(string.Empty, ss.GetCellContents("A1"));
     }
 
     [TestMethod]
-    public void GetNamesOfAllNonemptyCells_ReturnsCopy()
+    public void SetContentsOfCell_LowerCaseName_StoredAsUpperCase()
     {
-        Spreadsheet s = new();
-        s.SetCellContents("A1", 1.0);
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("a1", "5");
+        Assert.AreEqual(5.0, ss.GetCellContents("A1"));
+        Assert.AreEqual(5.0, ss.GetCellContents("a1"));
+        Assert.IsTrue(ss.GetNamesOfAllNonemptyCells().Contains("A1"));
+    }
 
-        ISet<string> names = s.GetNamesOfAllNonemptyCells();
-        names.Add("B2");
-        names.Remove("A1");
+    [TestMethod]
+    public void AnyMethod_InvalidName_ThrowsInvalidNameException()
+    {
+        Spreadsheet ss = new();
+        Assert.ThrowsExactly<InvalidNameException>(() => ss.GetCellContents("1A"));
+        Assert.ThrowsExactly<InvalidNameException>(() => ss.GetCellValue("A"));
+        Assert.ThrowsExactly<InvalidNameException>(() => ss["A-1"]);
+        Assert.ThrowsExactly<InvalidNameException>(() => ss.SetContentsOfCell("", "5"));
+        Assert.ThrowsExactly<InvalidNameException>(() => ss.SetContentsOfCell(null!, "5"));
+    }
 
-        CollectionAssert.AreEquivalent(s.GetNamesOfAllNonemptyCells().ToList(), new[] { "A1" });
+    [TestMethod]
+    public void SetContentsOfCell_NullContent_ThrowsArgumentNullException()
+    {
+        Spreadsheet ss = new();
+        Assert.ThrowsExactly<ArgumentNullException>(() => ss.SetContentsOfCell("A1", null!));
+    }
+
+    // ---------- SetContentsOfCell parsing ----------
+
+    [TestMethod]
+    public void SetContentsOfCell_Number_ContentsIsDouble()
+    {
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("A1", "2.5");
+        Assert.AreEqual(2.5, ss.GetCellContents("A1"));
+        Assert.AreEqual(2.5, ss.GetCellValue("A1"));
+    }
+
+    [TestMethod]
+    public void SetContentsOfCell_ScientificNotation_ContentsIsDouble()
+    {
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("A1", "1e3");
+        Assert.AreEqual(1000.0, ss.GetCellContents("A1"));
     }
 
 
     [TestMethod]
-    public void NullName_AllOperationsThrowInvalidName()
+    public void SetContentsOfCell_Text_ContentsIsString()
     {
-        Spreadsheet s = new();
-
-        Assert.Throws<InvalidNameException>(() => { s.GetCellContents(null!); });
-        Assert.Throws<InvalidNameException>(() => { s.SetCellContents(null!, 1.0); });
-        Assert.Throws<InvalidNameException>(() => { s.SetCellContents(null!, "text"); });
-        Assert.Throws<InvalidNameException>(() => { s.SetCellContents(null!, new Formula("1")); });
-    }
-
-    public void ValidName_IsAcceptedAndNormalized(string name, string normalized)
-    {
-        Spreadsheet s = new();
-        s.SetCellContents(name, 3.0);
-
-        CollectionAssert.AreEquivalent(s.GetNamesOfAllNonemptyCells().ToList(), new[] {normalized});
-        Assert.AreEqual(3.0, s.GetCellContents(name));
-        Assert.AreEqual(3.0, s.GetCellContents(normalized));
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("A1", "hello");
+        Assert.AreEqual("hello", ss.GetCellContents("A1"));
+        Assert.AreEqual("hello", ss.GetCellValue("A1"));
     }
 
     [TestMethod]
-    public void CellNames_AreCaseInsensitive()
+    public void SetContentsOfCell_NonFiniteText_ContentsIsString()
     {
-        Spreadsheet s = new();
-        s.SetCellContents("a1", 1.0);
-        s.SetCellContents("A1", 2.0);
-
-        CollectionAssert.AreEquivalent(s.GetNamesOfAllNonemptyCells().ToList(), new[] { "A1" });
-        Assert.AreEqual(2.0, s.GetCellContents("a1"));
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("A1", "Infinity");
+        ss.SetContentsOfCell("A2", "NaN");
+        Assert.AreEqual("Infinity", ss.GetCellContents("A1"));
+        Assert.AreEqual("NaN", ss.GetCellContents("A2"));
     }
 
     [TestMethod]
-    public void LeadingZeros_ProduceDistinctCells()
+    public void SetContentsOfCell_Formula_ContentsIsFormula()
     {
-        Spreadsheet s = new();
-        s.SetCellContents("A1", 1.0);
-        s.SetCellContents("A01", 2.0);
-
-        Assert.AreEqual(2, s.GetNamesOfAllNonemptyCells().Count);
-        Assert.AreEqual(1.0, s.GetCellContents("A1"));
-        Assert.AreEqual(2.0, s.GetCellContents("A01"));
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("B1", "=A1+2");
+        Assert.IsInstanceOfType(ss.GetCellContents("B1"), typeof(Formula));
+        Assert.AreEqual("A1+2", ss.GetCellContents("B1").ToString());
     }
 
     [TestMethod]
-    public void SetAndGet_Number()
+    public void SetContentsOfCell_BadFormula_ThrowsFormulaFormatException()
     {
-        Spreadsheet s = new();
-        s.SetCellContents("A1", 5.5);
-        Assert.AreEqual(5.5, s.GetCellContents("A1"));
-        Assert.IsInstanceOfType<double>(s.GetCellContents("A1"));
+        Spreadsheet ss = new();
+        Assert.ThrowsExactly<FormulaFormatException>(() => ss.SetContentsOfCell("A1", "=1+"));
+        Assert.AreEqual(string.Empty, ss.GetCellContents("A1"));
+        Assert.IsFalse(ss.Changed);
     }
 
     [TestMethod]
-    public void SetAndGet_ZeroAndNegative()
+    public void SetContentsOfCell_EmptyString_RemovesCell()
     {
-        Spreadsheet s = new();
-        s.SetCellContents("A1", 0.0);
-        s.SetCellContents("B1", -3.25);
-
-        Assert.AreEqual(0.0, s.GetCellContents("A1"));
-        Assert.AreEqual(-3.25, s.GetCellContents("B1"));
-        Assert.AreEqual(2, s.GetNamesOfAllNonemptyCells().Count);
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("A1", "5");
+        ss.SetContentsOfCell("A1", string.Empty);
+        Assert.AreEqual(0, ss.GetNamesOfAllNonemptyCells().Count);
+        Assert.AreEqual(string.Empty, ss.GetCellValue("A1"));
     }
 
     [TestMethod]
-    public void SetAndGet_Text()
+    public void SetContentsOfCell_FormulaReplacedByNumber_DropsDependencies()
     {
-        Spreadsheet s = new();
-        s.SetCellContents("A1", "hello");
-        Assert.AreEqual("hello", s.GetCellContents("A1"));
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("B1", "=A1+1");
+        ss.SetContentsOfCell("B1", "10");
+        IList<string> result = ss.SetContentsOfCell("A1", "3");
+        Assert.AreEqual(1, result.Count);
+        Assert.AreEqual(10.0, ss.GetCellValue("B1"));
     }
 
-    [TestMethod]
-    public void SetAndGet_TextThatLooksLikeOtherThings()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("A1", "5");
-        s.SetCellContents("B1", "=A1+1");
-
-        Assert.IsInstanceOfType<string>(s.GetCellContents("A1"));
-        Assert.AreEqual("=A1+1", s.GetCellContents("B1"));
-        CollectionAssert.AreEquivalent(s.SetCellContents("A1", "6").ToList(), new[] { "A1" });
-    }
+    // ---------- returned recalculation list ----------
 
     [TestMethod]
-    public void SetText_Whitespace_IsNonempty()
+    public void SetContentsOfCell_DependentCells_ReturnsDependencyOrder()
     {
-        Spreadsheet s = new();
-        s.SetCellContents("A1", "   ");
-
-        Assert.AreEqual("   ", s.GetCellContents("A1"));
-        CollectionAssert.AreEquivalent(s.GetNamesOfAllNonemptyCells().ToList(), new[] { "A1" });
-    }
-
-    [TestMethod]
-    public void SetAndGet_Formula()
-    {
-        Spreadsheet s = new();
-        Formula f = new("A2+11");
-        s.SetCellContents("A1", f);
-
-        Assert.IsInstanceOfType<Formula>(s.GetCellContents("A1"));
-        Assert.AreSame(f, s.GetCellContents("A1"));
-    }
-
-    [TestMethod]
-    public void SetFormula_NoVariables()
-    {
-        Spreadsheet s = new();
-        IList<string> result = s.SetCellContents("A1", new Formula("2+5"));
-
-        CollectionAssert.AreEquivalent(result.ToList(), new[] { "A1" });
-        CollectionAssert.AreEquivalent(s.GetNamesOfAllNonemptyCells().ToList(), new[] { "A1" });
-    }
-
-    [TestMethod]
-    public void SetFormula_ReferencedCellsStayEmpty()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("A1", new Formula("B1+C1"));
-
-        CollectionAssert.AreEquivalent(s.GetNamesOfAllNonemptyCells().ToList(), new[] { "A1" });
-        Assert.AreEqual(string.Empty, s.GetCellContents("B1"));
-    }
-
-    [TestMethod]
-    public void Overwrite_ChangesTypeAndKeepsOneCell()
-    {
-        Spreadsheet s = new();
-        Formula f = new("1+1");
-
-        s.SetCellContents("A1", 1.0);
-        s.SetCellContents("A1", "text");
-        Assert.AreEqual("text", s.GetCellContents("A1"));
-
-        s.SetCellContents("A1", f);
-        Assert.AreSame(f, s.GetCellContents("A1"));
-
-        s.SetCellContents("A1", 9.0);
-        Assert.AreEqual(9.0, s.GetCellContents("A1"));
-
-        Assert.AreEqual(1, s.GetNamesOfAllNonemptyCells().Count);
-    }
-
-    [TestMethod]
-    public void SetEmptyString_RemovesCell()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("A1", 5.0);
-        s.SetCellContents("B1", 6.0);
-
-        s.SetCellContents("A1", string.Empty);
-
-        Assert.AreEqual(string.Empty, s.GetCellContents("A1"));
-        CollectionAssert.AreEquivalent(s.GetNamesOfAllNonemptyCells().ToList(), new[] { "B1" });
-    }
-
-    [TestMethod]
-    public void SetEmptyString_OnNeverSetCell_StaysEmpty()
-    {
-        Spreadsheet s = new();
-        IList<string> result = s.SetCellContents("A1", string.Empty);
-
-        CollectionAssert.AreEquivalent(result.ToList(), new[] { "A1" });
-        Assert.AreEqual(0, s.GetNamesOfAllNonemptyCells().Count);
-    }
-
-    [TestMethod]
-    public void Set_IndependentCell_ReturnsOnlyItself()
-    {
-        Spreadsheet s = new();
-        CollectionAssert.AreEqual(new[] { "A1" }, s.SetCellContents("A1", 1.0).ToList());
-        CollectionAssert.AreEqual(new[] { "B1" }, s.SetCellContents("B1", "x").ToList());
-        CollectionAssert.AreEqual(new[] { "C1" }, s.SetCellContents("C1", new Formula("5")).ToList());
-    }
-
-    [TestMethod]
-    public void Set_LowercaseName_ReturnsNormalizedName()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("b1", new Formula("a1*2"));
-
-        IList<string> result = s.SetCellContents("a1", 1.0);
-
-        CollectionAssert.AreEqual(new[] { "A1", "B1" }, result.ToList());
-    }
-
-    [TestMethod]
-    public void Set_DocumentationExample_ReturnsA1B1C1()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("B1", new Formula("A1*2"));
-        s.SetCellContents("C1", new Formula("B1+A1"));
-
-        IList<string> result = s.SetCellContents("A1", 3.0);
-
-        CollectionAssert.AreEqual(new[] { "A1", "B1", "C1" }, result.ToList());
-    }
-
-    [TestMethod]
-    public void Set_RecalculateDocumentationExample()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("A1", 5.0);
-        s.SetCellContents("B1", new Formula("A1+2"));
-        s.SetCellContents("C1", new Formula("A1+B1"));
-        s.SetCellContents("D1", new Formula("A1*7"));
-        s.SetCellContents("E1", 15.0);
-
-        IList<string> result = s.SetCellContents("A1", 6.0);
-
-        CollectionAssert.AreEquivalent(result.ToList(), new[] { "A1", "B1", "C1", "D1" });
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("B1", "=A1*2");
+        ss.SetContentsOfCell("C1", "=B1+A1");
+        IList<string> result = ss.SetContentsOfCell("A1", "3");
+        Assert.AreEqual(3, result.Count);
         Assert.AreEqual("A1", result[0]);
-        CollectionAssert.Contains(result.ToList(), "B1");
-        CollectionAssert.Contains(result.ToList(), "C1");
-        Assert.IsTrue(result.IndexOf("B1") < result.IndexOf("C1"));
-    }
-
-    [TestMethod]
-    public void Set_DependentCell_DoesNotIncludeDependees()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("B1", new Formula("A1*2"));
-        s.SetCellContents("C1", new Formula("B1+A1"));
-
-        CollectionAssert.AreEqual(new[] { "C1" }, s.SetCellContents("C1", 1.0).ToList());
-    }
-
-    [TestMethod]
-    public void Set_IncludesIndirectDependents()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("B1", new Formula("A1"));
-        s.SetCellContents("C1", new Formula("B1"));
-        s.SetCellContents("D1", new Formula("C1"));
-
-        CollectionAssert.AreEqual(new[] { "A1", "B1", "C1", "D1" }, s.SetCellContents("A1", 1.0).ToList());
-    }
-
-    [TestMethod]
-    public void Set_Diamond_NoDuplicatesAndValidOrder()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("B1", new Formula("A1"));
-        s.SetCellContents("C1", new Formula("A1"));
-        s.SetCellContents("D1", new Formula("B1+C1"));
-
-        IList<string> result = s.SetCellContents("A1", 1.0);
-
-        CollectionAssert.AreEquivalent(result.ToList(),new[] {"A1", "B1", "C1", "D1"});
-        Assert.AreEqual("A1", result[0]);
-        CollectionAssert.Contains(result.ToList(), "B1");
-        CollectionAssert.Contains(result.ToList(), "D1");
-        Assert.IsTrue(result.IndexOf("B1") < result.IndexOf("D1"));
-        
-        CollectionAssert.Contains(result.ToList(), "C1");
-        CollectionAssert.Contains(result.ToList(), "D1");
-        Assert.IsTrue(result.IndexOf("C1") < result.IndexOf("D1"));
-    }
-
-    [TestMethod]
-    public void Set_FormulaWithRepeatedVariable_NoDuplicates()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("B1", new Formula("A1+A1*A1"));
-
-        CollectionAssert.AreEqual(new[] { "A1", "B1" }, s.SetCellContents("A1", 2.0).ToList());
-    }
-
-    [TestMethod]
-    public void Set_EmptyCellWithDependents_ReturnsDependents()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("B1", new Formula("A1+1"));
-
-        CollectionAssert.AreEqual(new[] { "A1", "B1" }, s.SetCellContents("A1", "text").ToList());
-    }
-
-    [TestMethod]
-    public void Set_FormulaWithLowercaseVariable_DependsOnNormalizedCell()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("B1", new Formula("a1+1"));
-
-        CollectionAssert.AreEqual(new[] { "A1", "B1" }, s.SetCellContents("A1", 1.0).ToList());
-    }
-
-    [TestMethod]
-    public void SetEmptyString_ReturnsDependents()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("A1", 1.0);
-        s.SetCellContents("B1", new Formula("A1"));
-
-        CollectionAssert.AreEqual(new[] { "A1", "B1" }, s.SetCellContents("A1", string.Empty).ToList());
-    }
-
-    [TestMethod]
-    public void ReplaceFormulaWithNumber_ClearsDependencies()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("B1", new Formula("A1+1"));
-        s.SetCellContents("B1", 10.0);
-
-        CollectionAssert.AreEqual(new[] { "A1" }, s.SetCellContents("A1", 1.0).ToList());
-    }
-
-    [TestMethod]
-    public void ReplaceFormulaWithText_ClearsDependencies()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("B1", new Formula("A1+1"));
-        s.SetCellContents("B1", "text");
-
-        CollectionAssert.AreEqual(new[] { "A1" }, s.SetCellContents("A1", 1.0).ToList());
-    }
-
-    [TestMethod]
-    public void ReplaceFormulaWithEmpty_ClearsDependencies()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("B1", new Formula("A1+1"));
-        s.SetCellContents("B1", string.Empty);
-
-        CollectionAssert.AreEqual(new[] { "A1" }, s.SetCellContents("A1", 1.0).ToList());
-    }
-
-    [TestMethod]
-    public void ReplaceFormulaWithFormula_MovesDependencies()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("B1", new Formula("A1"));
-        s.SetCellContents("B1", new Formula("C1"));
-
-        CollectionAssert.AreEqual(new[] { "A1" }, s.SetCellContents("A1", 1.0).ToList());
-        CollectionAssert.AreEqual(new[] { "C1", "B1" }, s.SetCellContents("C1", 1.0).ToList());
-    }
-
-    [TestMethod]
-    public void ReplaceFormulaWithSameFormula_NoDuplicates()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("B1", new Formula("A1"));
-        s.SetCellContents("B1", new Formula("A1"));
-
-        CollectionAssert.AreEqual(new[] { "A1", "B1" }, s.SetCellContents("A1", 1.0).ToList());
-    }
-
-    [TestMethod]
-    public void Circular_SelfReference_Throws()
-    {
-        Spreadsheet s = new();
-        Assert.ThrowsExactly<CircularException>(() => { s.SetCellContents("A1", new Formula("A1+1")); });
-    }
-
-    [TestMethod]
-    public void Circular_SelfReference_LeavesSpreadsheetEmpty()
-    {
-        Spreadsheet s = new();
-        Assert.ThrowsExactly<CircularException>(() => { s.SetCellContents("A1", new Formula("A1")); });
-
-        Assert.AreEqual(0, s.GetNamesOfAllNonemptyCells().Count);
-        Assert.AreEqual(string.Empty, s.GetCellContents("A1"));
-        CollectionAssert.AreEqual(new[] { "A1" }, s.SetCellContents("A1", 1.0).ToList());
-    }
-
-    [TestMethod]
-    public void Circular_TwoCells_Throws()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("A1", new Formula("B1"));
-        Assert.ThrowsExactly<CircularException>(() => { s.SetCellContents("B1", new Formula("A1")); });
-    }
-
-    [TestMethod]
-    public void Circular_ThreeCells_Throws()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("A1", new Formula("B1*2"));
-        s.SetCellContents("B1", new Formula("C1*2"));
-        Assert.ThrowsExactly<CircularException>(() => { s.SetCellContents("C1", new Formula("A1*2")); });
-    }
-
-    [TestMethod]
-    public void Circular_MixedCase_Throws()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("a1", new Formula("b1"));
-        Assert.ThrowsExactly<CircularException>(() => { s.SetCellContents("B1", new Formula("a1")); });
-    }
-
-    [TestMethod]
-    public void Circular_OneOfSeveralVariables_Throws()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("A1", new Formula("B1+1"));
-        Assert.ThrowsExactly<CircularException>(() => { s.SetCellContents("B1", new Formula("X1+Y1+A1")); });
-    }
-
-    [TestMethod]
-    public void Diamond_IsNotCircular()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("B1", new Formula("A1"));
-        s.SetCellContents("C1", new Formula("A1"));
-        s.SetCellContents("D1", new Formula("B1+C1"));
-
-        CollectionAssert.AreEquivalent(s.GetNamesOfAllNonemptyCells().ToList(), new[] {"B1", "C1", "D1" });
-    }
-
-    [TestMethod]
-    public void Circular_FailedSet_KeepsOldContents()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("A1", 5.0);
-
-        Assert.ThrowsExactly<CircularException>(() => { s.SetCellContents("A1", new Formula("A1+1")); });
-
-        Assert.AreEqual(5.0, s.GetCellContents("A1"));
-        CollectionAssert.AreEquivalent(s.GetNamesOfAllNonemptyCells().ToList(), new[] { "A1" });
-    }
-
-    [TestMethod]
-    public void Circular_FailedSet_LeavesDependenciesIntact()
-    {
-        Spreadsheet s = new();
-        s.SetCellContents("A1", 1.0);
-        s.SetCellContents("B1", new Formula("A1+1"));
-
-        Assert.ThrowsExactly<CircularException>(() => { s.SetCellContents("A1", new Formula("B1")); });
-
-        Assert.AreEqual(1.0, s.GetCellContents("A1"));
-        CollectionAssert.AreEqual(new[] { "A1", "B1" }, s.SetCellContents("A1", 2.0).ToList());
-        CollectionAssert.AreEqual(new[] { "B1" }, s.SetCellContents("B1", 2.0).ToList());
+        Assert.AreEqual("B1", result[1]);
+        Assert.AreEqual("C1", result[2]);
     }
     
     [TestMethod]
-    public void Circular_FailedSet_RestoresOldFormulaDependencies()
+    public void SetContentsOfCell_NoDependents_ReturnsOnlyItself()
     {
-        Spreadsheet s = new();
-        Formula original = new("C1+1");
-        s.SetCellContents("A1", original);
-        s.SetCellContents("B1", new Formula("A1"));
+        Spreadsheet ss = new();
+        IList<string> result = ss.SetContentsOfCell("A1", "hello");
+        Assert.AreEqual(1, result.Count);
+        Assert.AreEqual("A1", result[0]);
+    }
 
-        Assert.ThrowsExactly<CircularException>(() => { s.SetCellContents("A1", new Formula("B1")); });
+    // ---------- values ----------
 
-        Assert.AreSame(original, s.GetCellContents("A1"));
-        IList<string> result = s.SetCellContents("C1", 1.0);
-        CollectionAssert.AreEqual(new[] { "C1", "A1", "B1" }, result.ToList());
+    [TestMethod]
+    public void GetCellValue_Formula_ReturnsEvaluatedValue()
+    {
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("A1", "5");
+        ss.SetContentsOfCell("B1", "=A1*2");
+        Assert.AreEqual(10.0, ss.GetCellValue("B1"));
+        Assert.AreEqual(10.0, ss["B1"]);
     }
 
     [TestMethod]
-    public void Circular_SpreadsheetUsableAfterFailure()
+    public void GetCellValue_DependeeChanged_ValueUpdates()
     {
-        Spreadsheet s = new();
-        s.SetCellContents("A1", new Formula("B1"));
-        Assert.ThrowsExactly<CircularException>(() => { s.SetCellContents("B1", new Formula("A1")); });
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("A1", "5");
+        ss.SetContentsOfCell("B1", "=A1*2");
+        ss.SetContentsOfCell("C1", "=B1+A1");
+        Assert.AreEqual(15.0, ss.GetCellValue("C1"));
 
-        s.SetCellContents("B1", 4.0);
-
-        Assert.AreEqual(4.0, s.GetCellContents("B1"));
-        CollectionAssert.AreEqual(new[] { "B1", "A1" }, s.SetCellContents("B1", 5.0).ToList());
+        ss.SetContentsOfCell("A1", "1");
+        Assert.AreEqual(2.0, ss.GetCellValue("B1"));
+        Assert.AreEqual(3.0, ss.GetCellValue("C1"));
     }
 
-    [TestMethod] public void Reverse_DirectionAfterClearing_Valid()
+    [TestMethod]
+    public void GetCellValue_FormulaSetBeforeDependee_ValueFixedLater()
     {
-        Spreadsheet s = new();
-        s.SetCellContents("A1", new Formula("B1"));
-        s.SetCellContents("A1", string.Empty);
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("B1", "=A1+1");
+        Assert.IsTrue(ss.GetCellValue("B1") is FormulaError);
 
-        s.SetCellContents("B1", new Formula("A1"));
-
-        CollectionAssert.AreEqual(new[] { "A1", "B1" }, s.SetCellContents("A1", 1.0).ToList());
+        ss.SetContentsOfCell("A1", "1");
+        Assert.AreEqual(2.0, ss.GetCellValue("B1"));
+    }
+    
+    [TestMethod]
+    public void GetCellValue_EmptyCell_ReturnsEmptyString()
+    {
+        Spreadsheet ss = new();
+        Assert.AreEqual(string.Empty, ss.GetCellValue("Z99"));
+    }
+    
+    [TestMethod]
+    public void GetCellValue_FormulaUsesStringCell_ReturnsFormulaError()
+    {
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("A1", "hello");
+        ss.SetContentsOfCell("B1", "=A1+1");
+        Assert.IsTrue(ss.GetCellValue("B1") is FormulaError);
+    }
+    
+    [TestMethod]
+    public void GetCellValue_DivideByZero_ReturnsFormulaError()
+    {
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("A1", "=1/0");
+        Assert.IsTrue(ss.GetCellValue("A1") is FormulaError);
     }
 
+
+    [TestMethod]
+    public void GetCellValue_FormulaUsesErrorCell_ReturnsFormulaError()
+    {
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("A1", "=1/0");
+        ss.SetContentsOfCell("B1", "=A1+1");
+        Assert.IsTrue(ss.GetCellValue("B1") is FormulaError);
+    }
+
+    [TestMethod]
+    public void SetContentsOfCell_DependeeEmptied_DependentBecomesFormulaError()
+    {
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("A1", "5");
+        ss.SetContentsOfCell("B1", "=A1+1");
+        Assert.AreEqual(6.0, ss.GetCellValue("B1"));
+
+        ss.SetContentsOfCell("A1", string.Empty);
+        Assert.IsTrue(ss.GetCellValue("B1") is FormulaError);
+    }
+
+    [TestMethod]
+    public void GetCellValue_DiamondDependency_ValuesCorrect()
+    {
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("A1", "1");
+        ss.SetContentsOfCell("B1", "=A1+1");
+        ss.SetContentsOfCell("C1", "=A1+1");
+        ss.SetContentsOfCell("D1", "=B1+C1");
+        Assert.AreEqual(4.0, ss.GetCellValue("D1"));
+
+        ss.SetContentsOfCell("A1", "2");
+        Assert.AreEqual(6.0, ss.GetCellValue("D1"));
+    }
+
+    // ---------- circular dependencies ----------
+
+    [TestMethod]
+    public void SetContentsOfCell_SelfReference_ThrowsCircularException()
+    {
+        Spreadsheet ss = new();
+        Assert.ThrowsExactly<CircularException>(() => ss.SetContentsOfCell("A1", "=A1+1"));
+        Assert.AreEqual(string.Empty, ss.GetCellContents("A1"));
+    }
+
+    [TestMethod]
+    public void SetContentsOfCell_Circular_NoChangeMade()
+    {
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("A1", "=B1");
+        ss.SetContentsOfCell("B1", "=C1");
+        Assert.ThrowsExactly<CircularException>(() => ss.SetContentsOfCell("C1", "=A1"));
+        Assert.AreEqual(string.Empty, ss.GetCellContents("C1"));
+
+        // old dependencies must still be intact
+        IList<string> result = ss.SetContentsOfCell("C1", "5");
+        Assert.AreEqual(3, result.Count);
+        Assert.AreEqual(5.0, ss.GetCellValue("A1"));
+    }
+
+    [TestMethod]
+    public void SetContentsOfCell_Circular_ChangedStaysFalse()
+    {
+        Spreadsheet ss = new();
+        Assert.ThrowsExactly<CircularException>(() => ss.SetContentsOfCell("A1", "=A1"));
+        Assert.IsFalse(ss.Changed);
+    }
+
+    // ---------- Changed ----------
+
+    [TestMethod]
+    public void Changed_AfterSet_IsTrue()
+    {
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("A1", "5");
+        Assert.IsTrue(ss.Changed);
+    }
+    
+    [TestMethod]
+    public void Changed_AfterSave_IsFalseUntilNextChange()
+    {
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("A1", "5");
+        ss.Save("changed_test.txt");
+        Assert.IsFalse(ss.Changed);
+
+        ss.SetContentsOfCell("A1", "6");
+        Assert.IsTrue(ss.Changed);
+    }
+
+    // ---------- Save ----------
+
+    [TestMethod]
+    public void Save_EmptySpreadsheet_WritesEmptyCells()
+    {
+        Spreadsheet ss = new();
+        ss.Save("save_empty.txt");
+        string text = File.ReadAllText("save_empty.txt");
+        Assert.IsTrue(text.Contains("\"Cells\": {}"));
+    }
+
+    [TestMethod]
+    public void Save_ExistingFile_IsOverwritten()
+    {
+        File.WriteAllText("save_overwrite.txt", "old junk");
+
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("A1", "7");
+        ss.Save("save_overwrite.txt");
+
+        Spreadsheet loaded = new("save_overwrite.txt");
+        Assert.AreEqual(7.0, loaded.GetCellContents("A1"));
+    }
+
+    [TestMethod]
+    public void Save_BadPath_ThrowsSpreadsheetReadWriteException()
+    {
+        Spreadsheet ss = new();
+        Assert.ThrowsExactly<SpreadsheetReadWriteException>(() => ss.Save("/some/nonsense/path.txt"));
+    }
+
+    [TestMethod]
+    public void Save_BadPath_ChangedStaysTrue()
+    {
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("A1", "5");
+        Assert.ThrowsExactly<SpreadsheetReadWriteException>(() => ss.Save("/some/nonsense/path.txt"));
+        Assert.IsTrue(ss.Changed);
+    }
+
+    // ---------- load from file ----------
+
+    [TestMethod]
+    public void Constructor_SaveThenLoad_SameSpreadsheet()
+    {
+        Spreadsheet ss = new();
+        ss.SetContentsOfCell("A1", "5");
+        ss.SetContentsOfCell("B3", "=A1+2");
+        ss.SetContentsOfCell("C4", "hello");
+        ss.Save("roundtrip.txt");
+
+        Spreadsheet loaded = new("roundtrip.txt");
+        Assert.AreEqual(3, loaded.GetNamesOfAllNonemptyCells().Count);
+        Assert.AreEqual(5.0, loaded.GetCellContents("A1"));
+        Assert.AreEqual("A1+2", loaded.GetCellContents("B3").ToString());
+        Assert.AreEqual("hello", loaded.GetCellContents("C4"));
+        Assert.AreEqual(7.0, loaded.GetCellValue("B3"));
+        Assert.IsFalse(loaded.Changed);
+    }
+
+    [TestMethod]
+    public void Constructor_ValidFile_LoadsCells()
+    {
+        string sheet = """
+        {
+          "Cells": {
+            "A1": { "StringForm": "5" },
+            "B1": { "StringForm": "=A1*2" }
+          }
+        }
+        """;
+        File.WriteAllText("load_valid.txt", sheet);
+
+        Spreadsheet ss = new("load_valid.txt");
+        Assert.AreEqual(10.0, ss.GetCellValue("B1"));
+    }
+
+    [TestMethod]
+    public void Constructor_NoCells_LoadsEmptySpreadsheet()
+    {
+        File.WriteAllText("load_empty.txt", "{ \"Cells\" : {} }");
+
+        Spreadsheet ss = new("load_empty.txt");
+        Assert.AreEqual(0, ss.GetNamesOfAllNonemptyCells().Count);
+    }
+
+    [TestMethod]
+    public void Constructor_MissingFile_ThrowsSpreadsheetReadWriteException()
+    {
+        Assert.ThrowsExactly<SpreadsheetReadWriteException>(() => new Spreadsheet("/some/nonsense/missing.txt"));
+    }
+
+    [TestMethod]
+    public void Constructor_NotJson_ThrowsSpreadsheetReadWriteException()
+    {
+        File.WriteAllText("load_notjson.txt", "this is not json");
+        Assert.ThrowsExactly<SpreadsheetReadWriteException>(() => new Spreadsheet("load_notjson.txt"));
+    }
+
+    [TestMethod]
+    public void Constructor_NullJson_ThrowsSpreadsheetReadWriteException()
+    {
+        File.WriteAllText("load_null.txt", "null");
+        Assert.ThrowsExactly<SpreadsheetReadWriteException>(() => new Spreadsheet("load_null.txt"));
+    }
+
+    [TestMethod]
+    public void Constructor_NullCells_ThrowsSpreadsheetReadWriteException()
+    {
+        File.WriteAllText("load_nullcells.txt", "{ \"Cells\" : null }");
+        Assert.ThrowsExactly<SpreadsheetReadWriteException>(() => new Spreadsheet("load_nullcells.txt"));
+    }
+
+    [TestMethod]
+    public void Constructor_NullCell_ThrowsSpreadsheetReadWriteException()
+    {
+        File.WriteAllText("load_nullcell.txt", "{ \"Cells\" : { \"A1\" : null } }");
+        Assert.ThrowsExactly<SpreadsheetReadWriteException>(() => new Spreadsheet("load_nullcell.txt"));
+    }
+
+    [TestMethod]
+    public void Constructor_NullStringForm_ThrowsSpreadsheetReadWriteException()
+    {
+        File.WriteAllText("load_nullform.txt", "{ \"Cells\" : { \"A1\" : { \"StringForm\" : null } } }");
+        Assert.ThrowsExactly<SpreadsheetReadWriteException>(() => new Spreadsheet("load_nullform.txt"));
+    }
+
+    [TestMethod]
+    public void Constructor_InvalidCellName_ThrowsSpreadsheetReadWriteException()
+    {
+        File.WriteAllText("load_badname.txt", "{ \"Cells\" : { \"1A\" : { \"StringForm\" : \"5\" } } }");
+        Assert.ThrowsExactly<SpreadsheetReadWriteException>(() => new Spreadsheet("load_badname.txt"));
+    }
+
+    [TestMethod]
+    public void Constructor_InvalidFormula_ThrowsSpreadsheetReadWriteException()
+    {
+        File.WriteAllText("load_badformula.txt", "{ \"Cells\" : { \"A1\" : { \"StringForm\" : \"=1+\" } } }");
+        Assert.ThrowsExactly<SpreadsheetReadWriteException>(() => new Spreadsheet("load_badformula.txt"));
+    }
+
+
+    [TestMethod]
+    public void Constructor_CircularDependency_ThrowsSpreadsheetReadWriteException()
+    {
+        string sheet = """
+        {
+          "Cells": {
+            "A1": { "StringForm": "=B1" },
+            "B1": { "StringForm": "=A1" }
+          }
+        }
+        """;
+        File.WriteAllText("load_circular.txt", sheet);
+        Assert.ThrowsExactly<SpreadsheetReadWriteException>(() => new Spreadsheet("load_circular.txt"));
+    }
+
+    // ---------- stress tests ----------
+
+
+    [TestMethod]
+    [Timeout(10000)]
+    public void Stress_LongDependencyChain_ValuesCorrect()
+    {
+        Spreadsheet ss = new();
+        int size = 2000;
+
+        ss.SetContentsOfCell("A1", "1");
+        for (int i = 2; i <= size; i++)
+        {
+            ss.SetContentsOfCell("A" + i, "=A" + (i - 1) + "+1");
+        }
+
+        Assert.AreEqual((double)size, ss.GetCellValue("A" + size));
+
+        // changing the start of the chain has to update the whole chain
+        ss.SetContentsOfCell("A1", "2");
+        Assert.AreEqual((double)(size + 1), ss.GetCellValue("A" + size));
+    }
+    
+    [TestMethod]
+    [Timeout(10000)]
+    public void Stress_ManyDependents_ValuesCorrect()
+    {
+        Spreadsheet ss = new();
+        int size = 5000;
+
+        ss.SetContentsOfCell("A1", "1");
+        for (int i = 1; i <= size; i++)
+        {
+            ss.SetContentsOfCell("B" + i, "=A1+" + i);
+        }
+
+        IList<string> result = ss.SetContentsOfCell("A1", "10");
+        Assert.AreEqual(size + 1, result.Count);
+        Assert.AreEqual(10.0 + size, ss.GetCellValue("B" + size));
+    }
+
+    [TestMethod]
+    [Timeout(10000)]
+    public void Stress_ManyCells_SaveAndLoad()
+    {
+        Spreadsheet ss = new();
+        int size = 5000;
+
+        for (int i = 1; i <= size; i++)
+        {
+            ss.SetContentsOfCell("A" + i, i.ToString());
+        }
+
+        ss.Save("stress_save.txt");
+        Spreadsheet loaded = new("stress_save.txt");
+
+        Assert.AreEqual(size, loaded.GetNamesOfAllNonemptyCells().Count);
+        Assert.AreEqual((double)size, loaded.GetCellValue("A" + size));
+    }
 }
