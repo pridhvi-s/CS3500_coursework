@@ -1,0 +1,16 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "C#: GUI [http]",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "/home/alex/Documents/GitHub/CS3500_coursework/Spreadsheet/GUI/GUI.csproj",
+            "launchProfileName": "http",
+            "launchConfigurationId": "http"
+        }
+    ]
+}
