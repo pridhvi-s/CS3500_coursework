@@ -16,7 +16,7 @@
     <div class="spreadsheet">
         <p> Selected: @SelectedCellName </p>
         <p> Value: @CellsBackingStore[SelectedRow, SelectedCol] </p>
-        <input @bind="SelectedCellContents" @bind:event="oninput" />
+        <input @bind="FocusedTextInput" @bind:event="oninput" />
     </div>
 
     <div class="table-container">

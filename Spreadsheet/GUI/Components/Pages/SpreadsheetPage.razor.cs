@@ -4,6 +4,7 @@
 
 using System.Diagnostics;
 using System.Text;
+using Formula;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.JSInterop;
 using Spreadsheets;
@@ -15,6 +16,42 @@ namespace GUI.Components.Pages;
 /// </summary>
 public partial class SpreadsheetPage
 {
+    /// <summary>
+    /// 
+    /// </summary>
+    private string backingfocusedtextinput;
+    
+    /// <summary>
+    /// Holds the user input (valid or invalid)
+    /// </summary>
+    private string FocusedTextInput {
+        get
+        {
+            return backingfocusedtextinput;
+        }
+        set 
+        {
+            try
+            {
+                var updatedCells = spreadsheet.SetContentsOfCell(SelectedCellName, value);
+                foreach (string cell in updatedCells)
+                {
+                    var (row, col) = ParseCellName(cell);
+                    CellsBackingStore[row, col] = spreadsheet.GetCellValue(cell).ToString();
+                }
+            }
+            catch (FormulaFormatException e)
+            {
+                Console.WriteLine("expected2");
+            }
+            finally
+            {
+                backingfocusedtextinput = value;
+            }
+
+        }
+    }
+
     /// <summary>
     /// Based on your computer, you could shrink/grow this value based on performance.
     /// </summary>
@@ -76,13 +113,12 @@ public partial class SpreadsheetPage
             {
                 return;
             }
-
-            var updatedCells = spreadsheet.SetContentsOfCell(SelectedCellName, value);
-            foreach(string cell in updatedCells)
-            {
-                var (row, col) = ParseCellName(cell);
-                CellsBackingStore[row, col] = spreadsheet.GetCellValue(cell).ToString();
-            }
+                var updatedCells = spreadsheet.SetContentsOfCell(SelectedCellName, value);
+                foreach (string cell in updatedCells)
+                {
+                    var (row, col) = ParseCellName(cell);
+                    CellsBackingStore[row, col] = spreadsheet.GetCellValue(cell).ToString();
+                }
         }
     }
 
