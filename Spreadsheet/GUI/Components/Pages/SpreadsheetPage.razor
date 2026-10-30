@@ -13,6 +13,12 @@
 </span>
 
 <div>
+    <div class="spreadsheet">
+        <p> Selected: @SelectedCellName </p>
+        <p> Value: @CellsBackingStore[SelectedRow, SelectedCol] </p>
+        <input @bind="SelectedCellContents" @bind:event="oninput" />
+    </div>
+
     <div class="table-container">
         <div class="scrollable">
             <table class="table table-bordered">

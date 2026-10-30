@@ -3,8 +3,10 @@
 // </copyright>
 
 using System.Diagnostics;
+using System.Text;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.JSInterop;
+using Spreadsheets;
 
 namespace GUI.Components.Pages;
 
@@ -34,6 +36,10 @@ public partial class SpreadsheetPage
     /// </summary>
     private string FileSaveName { get; set; } = "Spreadsheet.sprd";
 
+    /// <summary>
+    ///   The spreadsheet being displayed and edited.
+    /// </summary>
+    private Spreadsheet spreadsheet = new Spreadsheet();
 
     /// <summary>
     ///   <para> Gets or sets the data for all the cells in the spreadsheet GUI. </para>
@@ -41,6 +47,62 @@ public partial class SpreadsheetPage
     /// </summary>
     private string[,] CellsBackingStore { get; set; } = new string[Rows, Cols];
 
+    /// <summary>
+    /// The row of the currently selected cell.
+    /// </summary>
+    /// <value>The Cell row</value>
+    public int SelectedRow { get; set; } = 1;
+
+    /// <summary>
+    /// The column of the currently selected cell.
+    /// </summary>
+    /// <value> The Cell column </value>
+    public int SelectedCol { get; set; } = 1;
+
+    public string SelectedCellContents
+    {
+        get
+        {
+            if (SelectedRow < 0 || SelectedCol < 0)
+            {
+                return string.Empty;
+            }
+
+            return spreadsheet.GetCellContents(SelectedCellName).ToString();
+        }
+        set
+        {
+            if (SelectedRow < 0 || SelectedCol < 0)
+            {
+                return;
+            }
+
+            var updatedCells = spreadsheet.SetContentsOfCell(SelectedCellName, value);
+            foreach(string cell in updatedCells)
+            {
+                var (row, col) = ParseCellName(cell);
+                CellsBackingStore[row, col] = spreadsheet.GetCellValue(cell).ToString();
+            }
+        }
+    }
+
+
+    /// <summary>
+    /// Gets the name of the currently selected cell, in the format "A1", "B2", etc.
+    /// </summary>
+    /// <value>The name of the selected cell</value>
+    public string SelectedCellName
+    {
+        get
+        {
+            if (SelectedRow < 0 || SelectedCol < 0)
+            {
+                return string.Empty;
+            }
+
+            return GetCellName(SelectedRow, SelectedCol);
+        }
+    }
 
     /// <summary>
     /// Handler for when a cell is clicked
@@ -49,7 +111,8 @@ public partial class SpreadsheetPage
     /// <param name="col">The column component of the cell's coordinates</param>
     private void CellClicked( int row, int col )
     {
-
+        SelectedRow = row;
+        SelectedCol = col;
     }
 
 
@@ -101,4 +164,45 @@ public partial class SpreadsheetPage
         }
     }
 
+    private static string GetCellName(int row, int col)
+    {
+        return ToColumnName(col + 1) + (row + 1).ToString();
+    }
+
+    private static (int row, int col) ParseCellName(string name)
+    {
+        // Extract the column letters and row numbers from the cell name
+        int i = 0;
+        while (i < name.Length && char.IsLetter(name[i]))
+        {
+            i++;
+        }
+        var colName = name.Substring(0, i);
+        var rowName = name.Substring(i);
+        return (int.Parse(rowName) - 1, FromColumnName(colName.ToUpper()) - 1);
+    }
+
+    private static int FromColumnName(string s)
+    {
+        int col = 0;
+        for (int i = 0; i < s.Length; i++)
+        {
+            col *= 26;
+            col += (s[i] - 'A' + 1);
+        }
+        return col; // row is not determined here
+    }
+
+    private static string ToColumnName(int n)   // 1-based: 1=A, 26=Z, 27=AA
+    {
+        var sb = new StringBuilder();
+        while (n > 0)
+        {
+            n--;                                  // shift to 0-based each digit
+            sb.Insert(0, (char)('A' + n % 26));
+            n /= 26;
+        }
+        
+        return sb.ToString();
+    }
 }
