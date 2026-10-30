@@ -33,7 +33,6 @@ public partial class SpreadsheetPage
     /// </summary>
     private char[] Alphabet { get; } = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".ToCharArray();
 
-
     /// <summary>
     ///   Gets or sets the name of the file to be saved
     /// </summary>
@@ -267,9 +266,39 @@ public partial class SpreadsheetPage
 
                 // fileContent will contain the contents of the loaded file
                 fileContent = await reader.ReadToEndAsync();
-
+                focusedTextInput = string.Empty;
                 spreadsheet = new Spreadsheet();
                 spreadsheet.LoadFromJson(fileContent);
+
+                // Clear the backing store before loading new values
+                for (int i = 0; i < Rows; i++)
+                {
+                    for (int j = 0; j < Cols; j++)
+                    {
+                        CellsBackingStore[i, j] = string.Empty;
+                    }
+                }
+
+                // Load all non empty cell contents from the spreadsheet into the backing store
+                foreach (var cells in spreadsheet.GetNamesOfAllNonemptyCells())
+                {
+                    var (row, col) = ParseCellName(cells);
+                    var cellValue = spreadsheet.GetCellValue(cells);
+
+                    if (cellValue is FormulaError)
+                    {
+                        CellsBackingStore[row, col] = "Error!";
+                    }
+                    else
+                    {
+                        CellsBackingStore[row, col] = cellValue.ToString();
+                    }
+                }
+
+                // Select 0, 0 (A1) after loading a new file
+                SelectedRow = 0;
+                SelectedCol = 0;
+
                 StateHasChanged();
             }
         }
