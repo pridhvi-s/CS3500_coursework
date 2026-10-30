@@ -13,7 +13,7 @@ using Spreadsheets;
 namespace GUI.Components.Pages;
 
 /// <summary>
-/// TODO: Fill in
+/// Main view pattern for the spreadsheet.  Displays the spreadsheet grid and its cells for the user to interact with. 
 /// </summary>
 public partial class SpreadsheetPage
 {
