@@ -4,4 +4,25 @@
 
 <h1>Hello, world!</h1>
 
-Welcome to your new app.
+<img src="thumbs-up.gif" alt="Thumbs Up" style="width: 200px; height: auto;" />
+<p>Welcome to your new app.</p>
+<li>
+    This is our spreadsheet application. It has a very typical user interface, with a grid of cells that can be selected via a mouse click.
+    During the selection of a cell a textbox above will be focused, and you can edit the contents of the cell. 
+</li>
+<li>
+    The application also has the menu bar at the side where you can access our spreadsheet application.
+</li>
+<li>
+    We display the value of a cell in the cell grid itself, during the editing process the textbox will display the contents of the cell,
+    and when you are done editing the cell, the value will be displayed in the cell grid.
+</li>
+<li>
+    The application interfacing with the razor component is done via the Spreadsheet class, and the view is updated via the
+    following class properties: FileSaveName, CellsBackingStore, SelectedRow, SelectedCol, FocusedTextInput. and SelectedCellName.
+</li>
+<li>
+    We are using property bindings to update the view when properties change. We choose this over using events because it 
+    allows us to have a more declarative approach when the user interacts with the application, and at the same time it
+    allows for a reactive state within the webpage aswell.
+</li>

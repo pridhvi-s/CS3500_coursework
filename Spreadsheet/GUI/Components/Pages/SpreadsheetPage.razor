@@ -6,6 +6,10 @@
 
 <PageTitle>Spreadsheet</PageTitle>
 
+<dialog id="alertBox">
+  <p>Something happened!</p>
+  <button onclick="this.closest('dialog').close()">OK</button>
+</dialog>
 
 <span>
     <button class="btn btn-primary" @onclick="SaveFile">Save</button>
@@ -16,7 +20,7 @@
     <div class="upper-panel">
         Selected: @SelectedCellName
         <input class="form-control" @ref="textInputRef" @bind="FocusedTextInput" @bind:event="oninput" />
-        Value: @CellsBackingStore[SelectedRow, SelectedCol]
+        Value: @CellsDisplayStore[SelectedRow, SelectedCol]
     </div>
 
     <div class="table-container">
@@ -45,7 +49,7 @@
                             <td @onclick="() => CellClicked(r, c)"
                                 class="@(r == SelectedRow && c == SelectedCol ? "selected-cell" : null)"
                                 style="padding:0 !important;">
-                                <p class="spreadcell">@CellsBackingStore[r, c]</p>
+                                <p class="spreadcell">@CellsDisplayStore[r, c]</p>
                             </td>
                             }
                         </tr>
@@ -132,6 +136,14 @@
 
 
 <script type="text/javascript">
+    function showAlert(message) {
+        var alertBox = document.getElementById('alertBox');
+        if (alertBox) {
+            alertBox.querySelector('p').textContent = message;
+            alertBox.showModal();
+        }
+    }
+
     function focusElement(id) {
         console.log(`looking for: ${id}`);
         var element = document.getElementById(id);

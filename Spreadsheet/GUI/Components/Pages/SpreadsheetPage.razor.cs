@@ -47,7 +47,15 @@ public partial class SpreadsheetPage
     ///   <para> Gets or sets the data for all the cells in the spreadsheet GUI. </para>
     ///   <remarks>Backing Store for HTML</remarks>
     /// </summary>
-    private string[,] CellsBackingStore { get; set; } = new string[Rows, Cols];
+    private string[,] CellsDisplayStore { get; set; } = new string[Rows, Cols];
+
+    /// <summary>
+    /// Contains the raw contents of the invalid cells.
+    /// This is used so that during the editing of an invalid formula,
+    /// the user can see what they typed, rather than the error message.
+    /// Note: THIS IS NOT SAVED TO THE SPREADSHEET, it is only used for display purposes.
+    /// </summary>
+    private string?[,] ExceptionContentsStore = new string[Rows, Cols];
 
     /// <summary>
     ///     The backing field for the currently selected row
@@ -133,7 +141,6 @@ public partial class SpreadsheetPage
             }
 
             var currentCellContents = GetCellContents(SelectedRow, SelectedCol);
-            
             if (currentCellContents == focusedTextInput)
             {
                 return currentCellContents.ToString();
@@ -158,23 +165,31 @@ public partial class SpreadsheetPage
                 {
                     var (row, col) = ParseCellName(cell);
                     var cellValue = spreadsheet.GetCellValue(cell);
+                    ExceptionContentsStore[row, col] = null; // Clear the invalid contents store for this cell
+                    
                     if (cellValue is FormulaError)
                     {
-                        CellsBackingStore[row, col] = "Error!";
+                        CellsDisplayStore[row, col] = "Error!";
                     }
                     else
                     {
-                        CellsBackingStore[row, col] = cellValue.ToString();
+                        CellsDisplayStore[row, col] = cellValue.ToString();
                     }
                 }
             }
             catch (FormulaFormatException e)
             {
-                Console.WriteLine("expected2");
+                // Update the backing store with the new value, even if it is invalid,
+                // so that the user can see what they typed.
+                ExceptionContentsStore[SelectedRow, SelectedCol] = value;
+                CellsDisplayStore[SelectedRow, SelectedCol] = "Formula Err!";
             }
             catch (CircularException e)
             {
-                Console.WriteLine("expected3");
+                // Update the backing store with the new value, even if it is invalid,
+                // so that the user can see what they typed.
+                ExceptionContentsStore[SelectedRow, SelectedCol] = value;
+                CellsDisplayStore[SelectedRow, SelectedCol] = "Circular!";
             }
             finally
             {
@@ -223,6 +238,11 @@ public partial class SpreadsheetPage
     /// <param name="col">The column component of the cell's coordinates</param>
     private string GetCellContents( int row, int col )
     {
+        if (ExceptionContentsStore[row, col] != null)
+        {
+            return ExceptionContentsStore[row, col];
+        }
+
         var cellName = GetCellName(row, col);
         var contents = spreadsheet.GetCellContents(cellName);
         if (contents is Formula.Formula)
@@ -275,7 +295,8 @@ public partial class SpreadsheetPage
                 {
                     for (int j = 0; j < Cols; j++)
                     {
-                        CellsBackingStore[i, j] = string.Empty;
+                        CellsDisplayStore[i, j] = string.Empty;
+                        ExceptionContentsStore[i, j] = null;
                     }
                 }
 
@@ -287,11 +308,11 @@ public partial class SpreadsheetPage
 
                     if (cellValue is FormulaError)
                     {
-                        CellsBackingStore[row, col] = "Error!";
+                        CellsDisplayStore[row, col] = "Error!";
                     }
                     else
                     {
-                        CellsBackingStore[row, col] = cellValue.ToString();
+                        CellsDisplayStore[row, col] = cellValue.ToString();
                     }
                 }
 
