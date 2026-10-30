@@ -7,6 +7,8 @@
 //     - Updated return types
 //     - Updated documentation
 
+using System.Text.Encodings.Web;
+
 namespace Spreadsheets;
 
 using System.Globalization;
@@ -728,12 +730,13 @@ public class Spreadsheet
     {
         JsonSerializerOptions options = new()
         {
-            WriteIndented = true
+            WriteIndented = true,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
         
         return JsonSerializer.Serialize(this, options);
     }
-
+    
     public void LoadFromJson(string json)
     {
         JsonElement data = JsonSerializer.Deserialize<JsonElement>(json);
@@ -754,11 +757,10 @@ public class Spreadsheet
 
         Changed = false;
     }
-
-    public string JsonString()
-    {
-        throw new NotImplementedException();
-        //one for returning the json string representing this spreadsheet - you already have the code that does this somewhere in your Save method, just move that code into its own method, return the json string, and update your Save method so that it calls that new method to get the text to write to a file.
-    }
+    
+    // TODO: and one for replacing the existing spreadsheet with a new one represented
+    // by a json string - you already have the logic for this as well (in your constructor),
+    // the difference is that this method takes in a string that already contains the json instead
+    // of taking a path to the file that contains json.
 
 }

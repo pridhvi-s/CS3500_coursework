@@ -238,7 +238,7 @@ public partial class SpreadsheetPage
     private async void SaveFile()
     {
         await JsRuntime.InvokeVoidAsync( "downloadFile", FileSaveName, 
-            "replace this with the json representation of the current spreadsheet" );
+            spreadsheet.ToJson());
     }
 
     /// <summary>
@@ -268,8 +268,8 @@ public partial class SpreadsheetPage
                 // fileContent will contain the contents of the loaded file
                 fileContent = await reader.ReadToEndAsync();
 
-                // TODO: Use the loaded fileContent to replace the current spreadsheet
-
+                spreadsheet = new Spreadsheet();
+                spreadsheet.LoadFromJson(fileContent);
                 StateHasChanged();
             }
         }
