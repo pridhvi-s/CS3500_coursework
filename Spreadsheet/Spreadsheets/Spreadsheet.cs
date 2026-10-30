@@ -726,6 +726,10 @@ public class Spreadsheet
         }
     }
 
+    /// <summary>
+    /// Returns a Json string of the spreadsheet and its filled cell contents
+    /// </summary>
+    /// <returns>Json representation of the Spreadsheet</returns>
     public string ToJson()
     {
         JsonSerializerOptions options = new()
@@ -736,7 +740,13 @@ public class Spreadsheet
         
         return JsonSerializer.Serialize(this, options);
     }
-    
+    /// <summary>
+    /// Loads a spreadsheet and its cell contents from a given Json string
+    /// </summary>
+    /// <param name="json">json string to be read</param>
+    /// <exception cref="JsonException">throws an exception when json is invalid,
+    /// or when "Cells" or a cell's "StringForm" property is missing.
+    /// </exception>
     public void LoadFromJson(string json)
     {
         JsonElement data = JsonSerializer.Deserialize<JsonElement>(json);
@@ -757,10 +767,5 @@ public class Spreadsheet
 
         Changed = false;
     }
-    
-    // TODO: and one for replacing the existing spreadsheet with a new one represented
-    // by a json string - you already have the logic for this as well (in your constructor),
-    // the difference is that this method takes in a string that already contains the json instead
-    // of taking a path to the file that contains json.
 
 }
