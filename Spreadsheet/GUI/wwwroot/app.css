@@ -13,7 +13,7 @@ a, .btn-link {
 }
 
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+  box-shadow: 0 0 0 0.1rem var(--page-bg), 0 0 0 0.25rem #258cfb;
 }
 
 .content {
@@ -48,4 +48,50 @@ h1:focus {
 
 .darker-border-checkbox.form-check-input {
     border-color: #929292;
+}
+
+/* ---------- Theme colors ---------- */
+
+:root {
+    --page-bg: #ffffff;
+    --sheet-header-bg: #ffffff;
+}
+
+html[data-theme="dark"] {
+    color-scheme: dark; /* dark scrollbars, file chooser and form controls */
+    --page-bg: #1b1d21;
+    --sheet-header-bg: #2b2e33;
+}
+
+html[data-theme="dark"] body {
+    background-color: var(--page-bg);
+    color: #e4e6ea;
+}
+
+html[data-theme="dark"] main a,
+html[data-theme="dark"] main .btn-link {
+    color: #6ea8fe;
+}
+
+html[data-theme="dark"] main .top-row {
+    background-color: #25282d;
+    border-bottom-color: #3d4148;
+}
+
+html[data-theme="dark"] .table {
+    color: #e4e6ea;
+    border-color: #4a4f57;
+}
+
+html[data-theme="dark"] .form-control,
+html[data-theme="dark"] .form-control:focus {
+    background-color: #25282d;
+    color: #e4e6ea;
+    border-color: #4a4f57;
+}
+
+html[data-theme="dark"] dialog {
+    background-color: #25282d;
+    color: #e4e6ea;
+    border: 1px solid #4a4f57;
 }

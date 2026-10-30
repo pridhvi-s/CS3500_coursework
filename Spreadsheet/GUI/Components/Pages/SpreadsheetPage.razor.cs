@@ -329,6 +329,45 @@ public partial class SpreadsheetPage
         }
     }
 
+    /// <summary>
+    ///   Whether the page is currently showing the dark theme. The theme itself lives in the
+    ///   browser (a data-theme attribute on the html element, remembered in localStorage),
+    ///   so this only drives the toggle button's label.
+    /// </summary>
+    private bool IsDarkMode { get; set; } = false;
+
+    /// <summary>
+    ///   Once the page is interactive, ask the browser which theme was applied at startup
+    ///   (saved choice, or the operating system's preference) so the button label is correct.
+    /// </summary>
+    /// <param name="firstRender">True only for the first render of this component.</param>
+    /// <returns>A task that completes when the theme has been read.</returns>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                IsDarkMode = await JsRuntime.InvokeAsync<string>("getTheme") == "dark";
+                StateHasChanged();
+            }
+            catch (Exception e) when (e is JSException || e is InvalidOperationException)
+            {
+                Debug.WriteLine("unable to read the current theme..." + e);
+            }
+        }
+    }
+
+    /// <summary>
+    ///   Switches between the light and dark themes and remembers the choice in the browser.
+    /// </summary>
+    /// <returns>A task that completes when the browser has applied the new theme.</returns>
+    private async Task ToggleDarkMode()
+    {
+        IsDarkMode = !IsDarkMode;
+        await JsRuntime.InvokeVoidAsync("setTheme", IsDarkMode ? "dark" : "light");
+    }
+
     private static string GetCellName(int row, int col)
     {
         return ToColumnName(col + 1) + (row + 1).ToString();
