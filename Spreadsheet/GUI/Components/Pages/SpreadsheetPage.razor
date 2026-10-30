@@ -16,7 +16,7 @@
     <div class="spreadsheet">
         <p> Selected: @SelectedCellName </p>
         <p> Value: @CellsBackingStore[SelectedRow, SelectedCol] </p>
-        <input @bind="FocusedTextInput" @bind:event="oninput" />
+        <input @ref="textInputRef" @bind="FocusedTextInput" @bind:event="oninput" />
     </div>
 
     <div class="table-container">
@@ -42,9 +42,11 @@
                                 int r = row;
                                 int c = col;
 
-                                <td @onclick="() => CellClicked(r,c)" style="padding:0 !important;">
-                                    <p class="spreadcell"> @CellsBackingStore[r, c]  </p>
-                                </td>
+                            <td @onclick="() => CellClicked(r, c)"
+                                class="@(r == SelectedRow && c == SelectedCol ? "selected-cell" : null)"
+                                style="padding:0 !important;">
+                                <p class="spreadcell">@CellsBackingStore[r, c]</p>
+                            </td>
                             }
                         </tr>
                     }
@@ -58,6 +60,19 @@
     .spreadcell {
         width: 150px;
         height: 40px;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        padding-left: 5px;
+    }
+
+    td {
+        vertical-align: middle;
+    }
+
+    .selected-cell .spreadcell {
+        box-shadow: inset 0 0 0 2px #11e558;
+        padding-left: 10px;
     }
 
     .table-container {
@@ -83,6 +98,17 @@
         width: 1000px;
         height: 500px;
         margin: -1px;
+    }
+
+    .selected-cell {
+        position: relative;
+    }
+    .selected-cell::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 4px solid #11e558;
+        pointer-events: none;
     }
 </style>
 

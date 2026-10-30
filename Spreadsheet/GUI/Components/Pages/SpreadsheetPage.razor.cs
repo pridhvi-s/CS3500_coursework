@@ -5,6 +5,7 @@
 using System.Diagnostics;
 using System.Text;
 using Formula;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.JSInterop;
 using Spreadsheets;
@@ -16,41 +17,6 @@ namespace GUI.Components.Pages;
 /// </summary>
 public partial class SpreadsheetPage
 {
-    /// <summary>
-    /// 
-    /// </summary>
-    private string backingfocusedtextinput;
-    
-    /// <summary>
-    /// Holds the user input (valid or invalid)
-    /// </summary>
-    private string FocusedTextInput {
-        get
-        {
-            return backingfocusedtextinput;
-        }
-        set 
-        {
-            try
-            {
-                var updatedCells = spreadsheet.SetContentsOfCell(SelectedCellName, value);
-                foreach (string cell in updatedCells)
-                {
-                    var (row, col) = ParseCellName(cell);
-                    CellsBackingStore[row, col] = spreadsheet.GetCellValue(cell).ToString();
-                }
-            }
-            catch (FormulaFormatException e)
-            {
-                Console.WriteLine("expected2");
-            }
-            finally
-            {
-                backingfocusedtextinput = value;
-            }
-
-        }
-    }
 
     /// <summary>
     /// Based on your computer, you could shrink/grow this value based on performance.
@@ -85,18 +51,80 @@ public partial class SpreadsheetPage
     private string[,] CellsBackingStore { get; set; } = new string[Rows, Cols];
 
     /// <summary>
+    ///     The backing field for the currently selected row
+    /// </summary>
+    private int selectedRow = 0;
+
+    /// <summary>
     /// The row of the currently selected cell.
     /// </summary>
     /// <value>The Cell row</value>
-    public int SelectedRow { get; set; } = 1;
+    public int SelectedRow
+    {
+        get
+        {
+            return selectedRow;
+        }
+        set
+        {
+            if (value < 0 || value >= Rows)
+            {
+                return;
+            }
+
+            if (selectedRow != value)
+            {
+                // Update the focused text input when the selected row changes
+                selectedRow = value;
+                FocusedTextInput = GetCellContents(SelectedRow, SelectedCol);
+                StateHasChanged();
+            }
+        }
+    }
+
+    /// <summary>
+    ///     The backing field for the currently selected column
+    /// </summary>
+    private int selectedCol = 0;
 
     /// <summary>
     /// The column of the currently selected cell.
     /// </summary>
     /// <value> The Cell column </value>
-    public int SelectedCol { get; set; } = 1;
+    public int SelectedCol {
+        get
+        {
+            return selectedCol;
+        }
+        set
+        {
+            if (value < 0 || value >= Cols)
+            {
+                return;
+            }
 
-    public string SelectedCellContents
+            if (selectedCol != value)
+            {
+                // Update the focused text input when the selected column changes
+                selectedCol = value;
+                FocusedTextInput = GetCellContents(SelectedRow, SelectedCol);
+                StateHasChanged();
+            }
+        }
+    }
+
+    private ElementReference textInputRef;
+
+    /// <summary>
+    /// 
+    /// </summary>
+    private string focusedTextInput;
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <value></value>
+    public string FocusedTextInput
     {
         get
         {
@@ -105,7 +133,17 @@ public partial class SpreadsheetPage
                 return string.Empty;
             }
 
-            return spreadsheet.GetCellContents(SelectedCellName).ToString();
+            var currentCellContents = GetCellContents(SelectedRow, SelectedCol);
+            
+            if (currentCellContents == focusedTextInput)
+            {
+                return currentCellContents.ToString();
+            }
+
+            // If the current cell contents have changed, but are
+            // different from the focused text input, we want to return the focused text input
+            // as the focused text input may be invalid.
+            return focusedTextInput;
         }
         set
         {
@@ -113,12 +151,37 @@ public partial class SpreadsheetPage
             {
                 return;
             }
+
+            try
+            {
                 var updatedCells = spreadsheet.SetContentsOfCell(SelectedCellName, value);
                 foreach (string cell in updatedCells)
                 {
                     var (row, col) = ParseCellName(cell);
-                    CellsBackingStore[row, col] = spreadsheet.GetCellValue(cell).ToString();
+                    var cellValue = spreadsheet.GetCellValue(cell);
+                    if (cellValue is FormulaError)
+                    {
+                        CellsBackingStore[row, col] = "Error!";
+                    }
+                    else
+                    {
+                        CellsBackingStore[row, col] = cellValue.ToString();
+                    }
                 }
+            }
+            catch (FormulaFormatException e)
+            {
+                Console.WriteLine("expected2");
+            }
+            catch (CircularException e)
+            {
+                Console.WriteLine("expected3");
+            }
+            finally
+            {
+                focusedTextInput = value;
+            }
+
         }
     }
 
@@ -149,8 +212,24 @@ public partial class SpreadsheetPage
     {
         SelectedRow = row;
         SelectedCol = col;
+        textInputRef.FocusAsync();
     }
 
+
+    /// <summary>
+    /// Gets the string contents of a cell if its a formula it starts
+    /// with an equals sign.
+    /// </summary>
+    /// <param name="row">The row component of the cell's coordinates</param>
+    /// <param name="col">The column component of the cell's coordinates</param>
+    private string GetCellContents( int row, int col )
+    {
+        var cellName = GetCellName(row, col);
+        var contents = spreadsheet.GetCellContents(cellName);
+        if (contents is Formula.Formula)
+            contents = "=" + contents.ToString();
+        return contents.ToString();
+    }
 
     /// <summary>
     /// Saves the current spreadsheet, by providing a download of a file
