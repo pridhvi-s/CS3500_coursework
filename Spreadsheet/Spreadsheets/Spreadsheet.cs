@@ -111,17 +111,18 @@ public class InvalidNameException : Exception
 public class Spreadsheet
 {
     // dictionary of cells which maps the name of the cell to the cell object
+    [JsonInclude]
+    [JsonPropertyName("Cells")]
     private Dictionary<string, Cell> cells = new();
 
     // dependency graph for the spreadsheet
+    [JsonIgnore]
     private DependencyGraph dependencies = new();
 
     // provided regex pattern for variables (valid cell names)
+    [JsonIgnore] 
     private static string VariableRegExPattern = @"[a-zA-Z]+\d+";
-
-    // options used when writing the spreadsheet to a file
-    private static readonly JsonSerializerOptions SaveOptions = new() { WriteIndented = true };
-
+    
     /// <summary>
     /// Default constructor to create a new spreadsheet of empty cells.
     /// </summary>
@@ -145,15 +146,13 @@ public class Spreadsheet
     {
         try
         {
-            string json = File.ReadAllText(filename);
-            SpreadsheetData? data = JsonSerializer.Deserialize<SpreadsheetData>(json);
-
-            if (data?.Cells is null)
+            LoadFromJson(File.ReadAllText(filename));
+        if (this.cells is null)
             {
                 throw new SpreadsheetReadWriteException("This file does not contain a valid spreadsheet");
             }
 
-            foreach (KeyValuePair<string, CellData?> entry in data.Cells)
+            foreach (KeyValuePair<string, Cell?> entry in this.cells)
             {
                 if (entry.Value?.StringForm is null)
                 {
@@ -180,6 +179,8 @@ public class Spreadsheet
     /// True if this spreadsheet has been changed since it was
     /// created or saved, otherwise false
     /// </summary>
+
+    [JsonIgnore] 
     public bool Changed { get; private set; }
 
     /// <summary>
@@ -359,13 +360,7 @@ public class Spreadsheet
     {
         try
         {
-            SpreadsheetData data = new();
-            foreach (KeyValuePair<string, Cell> entry in cells)
-            {
-                data.Cells[entry.Key] = new CellData { StringForm = entry.Value.StringForm };
-            }
-
-            string json = JsonSerializer.Serialize(data, SaveOptions);
+            string json = this.ToJson();
             File.WriteAllText(filename, json);
         }
         catch (Exception e)
@@ -373,7 +368,6 @@ public class Spreadsheet
             throw new SpreadsheetReadWriteException("Unable to save the spreadsheet to " + filename + 
                 " Message: " + e.Message);
         }
-
         Changed = false;
     }
 
@@ -687,6 +681,7 @@ public class Spreadsheet
     /// <summary>
     /// A Cell object represents a single cell in the spreadsheet
     /// </summary>
+    
     public class Cell
     {
         /// <summary>
@@ -702,11 +697,13 @@ public class Spreadsheet
         /// <summary>
         /// Gets cell contents (string, double, Formula)
         /// </summary>
+        [JsonIgnore]
         public object Contents { get; }
 
         /// <summary>
         /// Gets or sets the cell value (string, double, FormulaError)
         /// </summary>
+        [JsonIgnore]
         public object Value { get; set; }
 
         /// <summary>
@@ -727,27 +724,41 @@ public class Spreadsheet
         }
     }
 
-    /// <summary>
-    /// The shape of a saved spreadsheet file: { "Cells": { "A1": { "StringForm": "5" } } }
-    /// </summary>
-    internal class SpreadsheetData
+    public string ToJson()
     {
-        /// <summary>
-        /// Gets or sets the cells, keyed by name
-        /// </summary>
-        [JsonPropertyName("Cells")]
-        public Dictionary<string, CellData?> Cells { get; set; } = new();
+        JsonSerializerOptions options = new()
+        {
+            WriteIndented = true
+        };
+        
+        return JsonSerializer.Serialize(this, options);
     }
 
-    /// <summary>
-    /// The saved form of a single cell
-    /// </summary>
-    internal class CellData
+    public void LoadFromJson(string json)
     {
-        /// <summary>
-        /// Gets or sets the text form of the cell's contents
-        /// </summary>
-        [JsonPropertyName("StringForm")]
-        public string StringForm { get; set; } = string.Empty;
+        JsonElement data = JsonSerializer.Deserialize<JsonElement>(json);
+        JsonElement savedCells = data.GetProperty("Cells");
+
+        if (savedCells.ValueKind != JsonValueKind.Object)
+        {
+            throw new JsonException("Invalid Cells object.");
+        }
+
+        foreach (JsonProperty cell in savedCells.EnumerateObject())
+        {
+            string content = cell.Value.GetProperty("StringForm").GetString() ??
+                             throw new JsonException("Invalid StringForm.");
+
+            SetContentsOfCell(cell.Name, content);
+        }
+
+        Changed = false;
     }
+
+    public string JsonString()
+    {
+        throw new NotImplementedException();
+        //one for returning the json string representing this spreadsheet - you already have the code that does this somewhere in your Save method, just move that code into its own method, return the json string, and update your Save method so that it calls that new method to get the text to write to a file.
+    }
+
 }
