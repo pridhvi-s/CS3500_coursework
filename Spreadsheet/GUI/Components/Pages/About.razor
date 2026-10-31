@@ -26,3 +26,26 @@
     allows us to have a more declarative approach when the user interacts with the application, and at the same time it
     allows for a reactive state within the webpage aswell.
 </li>
+
+<h2>Additional Feature: Dark Mode</h2>
+<p>
+    We added a light/dark theme toggle to the spreadsheet. The button is in the toolbar next to Save and Load,
+    and it switches between "🌙 Dark mode" and "☀ Light mode".
+</p>
+<ul>
+    <li>
+        <strong>How it works:</strong> The theme is stored as a <code>data-theme</code> attribute ("light" or "dark")
+        on the <code>&lt;html&gt;</code> element. The CSS defines colors as variables (such as <code>--page-bg</code>
+        and <code>--sheet-header-bg</code>) and overrides them under <code>html[data-theme="dark"]</code>. Switching
+        themes only changes that one attribute, and the stylesheet does the rest. This covers the page, the top row,
+        the table (via Bootstrap's <code>--bs-table-*</code> variables), and text inputs.
+    </li>
+    <li>
+        <strong>Persistence:</strong> The chosen theme is saved in the browser's <code>localStorage</code>. On first
+        visit, the app follows the operating system's <code>prefers-color-scheme</code> setting.
+    </li>
+    <li>
+        <strong>AI assistance:</strong> An AI assistant helped write the theme script, the dark-mode CSS and the
+        toggle button. It was used only for this additional feature, as the assignment allows.
+    </li>
+</ul>
