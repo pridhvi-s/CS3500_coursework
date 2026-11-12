@@ -1,0 +1,162 @@
+﻿@page "/chatclient"
+@rendermode InteractiveServer
+@using Networking
+
+
+<PageTitle>Chat Client</PageTitle>
+
+<h1>Chat Client</h1>
+
+<div id="ConnectionInputs">
+    <div class="input-row">
+        <label for="url"> Server Address: </label>
+        <input id="url" disabled="@_network.IsConnected" type="text" @bind="_serverNameOrAddress" />
+        <label for="url"> Port: </label>
+        <input id="port" disabled="@_network.IsConnected" type="number" @bind="_serverPort" class="port" />
+        @if ( _network.IsConnected )
+        {
+            <button class="btn btn-primary" @onclick="DisconnectFromServer">Disconnect</button>
+        }
+        else
+        {
+            <button class="btn btn-primary" @onclick="ConnectToServer">Connect</button>
+        }
+    </div>
+
+
+    @{
+        bool disconnected = !_network.IsConnected;
+        string grayedOut = disconnected ? "grayedOut" : string.Empty;
+    }
+
+    <div class="input-row">
+        <label for="message"> Chat: </label>
+        <input id="message" class="@grayedOut" disabled="@(disconnected)" type="text" @onchange="HandleSendMessage" />
+    </div>
+    <div class="input-row">
+        <div class="input-col">
+            <div id="Messages" class="container @grayedOut">
+                @lock (_allMessages) 
+                {
+                    foreach (var line in _allMessages) 
+                    { 
+                        <span class="themClass">
+                            @line
+                        </span>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@code
+{
+    /// <summary>
+    /// Default server name
+    /// </summary>
+    private string _serverNameOrAddress = "localhost";
+
+    /// <summary>
+    /// Default server port
+    /// </summary>
+    private int _serverPort = 11000;
+
+    /// <summary>
+    /// The NetworkConnection object representing a connection with the server
+    /// </summary>
+    private NetworkConnection _network = null!;
+
+    /// <summary>
+    /// The string shown in the message display area, representing all messages seen
+    /// </summary>
+    private string MessageDisplayTextAreaData
+    {
+        get
+        {
+            return string.Join( "\n", _allMessages );
+        }
+    }
+
+    /// <summary>
+    /// All the messages seen by the server
+    /// </summary>
+    private readonly List<string> _allMessages = new();
+
+
+    /// <summary>
+    /// Disconnect the network object from the server.
+    /// </summary>
+    private void DisconnectFromServer()
+    {
+        _network.Disconnect();
+    }
+
+    /// <summary>
+    /// Handler for the connect button
+    /// Attempt to connect to the server, then start an asynchronous loop
+    /// to receive and display messages.
+    /// </summary>
+    private void ConnectToServer()
+    {
+        try
+        {
+            _network.Connect( _serverNameOrAddress, _serverPort );
+
+            // Communicating with the server needs to be asynchronous so that the UI thread 
+            // can continue drawing.
+            new Thread( () =>
+            {
+                while ( _network.IsConnected )
+                {
+                    try
+                    {
+                        var message = _network.ReadLine();
+
+                        message = $"{DateTime.Now:HH:mm tt} - {message}";
+                        lock (_allMessages)
+                        {
+                            _allMessages.Insert( 0, message );
+                        }
+
+                        // Since we are changing the UI from another thread, we need to 
+                        // use the dispatcher for StateHasChanged
+                        InvokeAsync( StateHasChanged );
+                    }
+                    catch
+                    {
+                        // add anything needed here to handle a disconnection from the server
+                    }
+                }
+            } ).Start();
+        }
+        catch
+        {
+            // add anything needed here to handle a failure to connect
+        }
+
+    }
+
+    /// <summary>
+    ///   When the user types a message and presses enter, send the message
+    ///   to the server.
+    /// </summary>
+    /// <param name="e"> Event data containing the message. </param>
+    private void HandleSendMessage( ChangeEventArgs e )
+    {
+        if ( e.Value != null )
+        {
+            _network.Send( $"{e.Value}" );
+        }
+    }
+
+    /// <summary>
+    ///   Create a default network object
+    /// </summary>
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _network = new();
+    }
+}
