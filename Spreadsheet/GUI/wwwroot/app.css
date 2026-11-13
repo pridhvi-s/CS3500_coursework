@@ -78,11 +78,6 @@ html[data-theme="dark"] main .top-row {
     border-bottom-color: #3d4148;
 }
 
-html[data-theme="dark"] .table {
-    color: #e4e6ea;
-    border-color: #4a4f57;
-}
-
 html[data-theme="dark"] .form-control,
 html[data-theme="dark"] .form-control:focus {
     background-color: #25282d;
@@ -94,4 +89,12 @@ html[data-theme="dark"] dialog {
     background-color: #25282d;
     color: #e4e6ea;
     border: 1px solid #4a4f57;
+}
+
+html[data-theme="dark"] .table {
+  --bs-table-color: #e4e6ea;
+  --bs-table-bg: #1b1d21;
+  --bs-table-border-color: #4a4f57;
+  --bs-table-striped-bg: #25282d;
+  --bs-table-hover-bg: #2b2e33;
 }

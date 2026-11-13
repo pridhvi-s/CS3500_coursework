@@ -133,6 +133,66 @@
         margin-left: 35px;
         margin-right: 35px;
     }
+
+    :root {
+        --page-bg: #ffffff;
+        --sheet-header-bg: #ffffff;
+    }
+
+    html[data-theme="dark"] {
+    --dialog-bg: #25282d;
+    --dialog-text: #e4e6ea;
+    }
+
+    html[data-theme="dark"] {
+        color-scheme: dark; /* dark scrollbars, file chooser and form controls */
+        --page-bg: #1b1d21;
+        --sheet-header-bg: #2b2e33;
+    }
+
+    html[data-theme="dark"] body {
+        background-color: var(--page-bg);
+        color: #e4e6ea;
+    }
+
+    html[data-theme="dark"] main a,
+    html[data-theme="dark"] main .btn-link {
+        color: #6ea8fe;
+    }
+
+    html[data-theme="dark"] main .top-row {
+        background-color: #25282d;
+        border-bottom-color: #3d4148;
+    }
+
+    html[data-theme="dark"] .form-control,
+    html[data-theme="dark"] .form-control:focus {
+        background-color: #25282d;
+        color: #e4e6ea;
+        border-color: #4a4f57;
+    }
+
+    html[data-theme="dark"] dialog {
+        background-color: #25282d;
+        color: #e4e6ea;
+        border: 1px solid #4a4f57;
+    }
+
+    html[data-theme="dark"] .table {
+        --bs-table-color: #e4e6ea;
+        --bs-table-bg: #1b1d21;
+        --bs-table-border-color: #4a4f57;
+        --bs-table-striped-bg: #25282d;
+        --bs-table-hover-bg: #2b2e33;
+    }
+
+    /* Table text: white everywhere */
+    html[data-theme="dark"] .table,
+    html[data-theme="dark"] .table th,
+    html[data-theme="dark"] .table td,
+    html[data-theme="dark"] .table .spreadcell {
+    color: #ffffff !important;
+    }
 </style>
 
 
