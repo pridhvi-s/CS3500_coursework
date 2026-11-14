@@ -65,8 +65,7 @@ public sealed class NetworkConnection : IDisposable
     {
         get
         {
-            // TODO: implement this
-            throw new NotImplementedException();
+            return _tcpClient.Connected;
         }
     }
 
@@ -78,8 +77,9 @@ public sealed class NetworkConnection : IDisposable
     /// <param name="port"> The port, e.g., 11000. </param>
     public void Connect( string host, int port )
     {
-        // TODO: implement this
-        throw new NotImplementedException();
+        _tcpClient.Connect(host, port);
+        _reader = new StreamReader(_tcpClient.GetStream());
+        _writer = new StreamWriter(_tcpClient.GetStream()) {AutoFlush = true};
     }
 
 
@@ -94,8 +94,12 @@ public sealed class NetworkConnection : IDisposable
     /// <param name="message"> The string of characters to send. </param>
     public void Send( string message )
     {
-        // TODO: Implement this
-        throw new NotImplementedException();
+        if (!IsConnected || _writer is null)
+        {
+            throw new InvalidOperationException("Connection failed");
+        }
+        
+        _writer.WriteLine(message);
     }
 
 
@@ -108,8 +112,20 @@ public sealed class NetworkConnection : IDisposable
     /// <returns> The contents of the message. </returns>
     public string ReadLine( )
     {
-        // TODO: implement this
-        throw new NotImplementedException();
+        if (!IsConnected || _writer is null)
+        {
+            throw new InvalidOperationException("Connection failed");
+        }
+
+        string? line = _reader.ReadLine();
+        
+        // null if remote side closes connection
+        if (line is null)
+        {
+            throw new InvalidOperationException("Connection closed");
+        }
+
+        return line;
     }
 
     /// <summary>
@@ -118,8 +134,11 @@ public sealed class NetworkConnection : IDisposable
     /// </summary>
     public void Disconnect( )
     {
-        //TODO: implement this
-        throw new NotImplementedException();
+        _reader?.Dispose();
+        _writer?.Dispose();
+        _tcpClient.Dispose();
+        _reader = null;
+        _writer = null;
     }
 
     /// <summary>
