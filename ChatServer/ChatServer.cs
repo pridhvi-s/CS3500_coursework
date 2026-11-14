@@ -13,6 +13,16 @@ namespace Chatting;
 public abstract class ChatServer
 {
     /// <summary>
+    /// Stops two threads from writing to the same StreamWriter simultaneously
+    /// </summary>
+    private static object sync = new();
+    
+    /// <summary>
+    /// List of the clients that have sent a name
+    /// </summary>
+    private static List<NetworkConnection> clients = new();
+
+    /// <summary>
     ///   The main program.
     /// </summary>
     private static void Main( string[] _ )
@@ -28,21 +38,58 @@ public abstract class ChatServer
     ///   </pre>
     /// </summary>
     ///
-    private static void HandleConnect( NetworkConnection connection )
+    private static void HandleConnect(NetworkConnection connection)
     {
-        // handle all messages until disconnect.
         try
         {
-            while ( true )
-            {
-                var message = connection.ReadLine( );
+            string name = connection.ReadLine();
 
-                connection.Send( "thanks!" );
+            lock (sync)
+            {
+                clients.Add(connection);
+            }
+
+            while (true)
+            {
+                string message = connection.ReadLine();
+                BroadcastMessage(name + ": " + message);
             }
         }
-        catch ( Exception )
+        catch (Exception)
         {
-            // do anything necessary to handle a disconnected client in here
+            // client disconnected, or read failed, now to clean up 
+        }
+        finally
+        {
+            lock (sync)
+            {
+                clients.Remove(connection);
+            }
+            connection.Dispose();
         }
     }
+    
+    /// <summary>
+    /// Sends a message to every connected client, including the sender. Also handles failed
+    /// sends by removing them .
+    /// </summary>
+    /// <param name="message">The string of characters to send.</param>
+    private static void BroadcastMessage(string message)
+    {
+        lock (sync)
+        {
+            foreach (NetworkConnection client in clients)
+            {
+                try
+                {
+                    client.Send(message);
+                }
+                catch (Exception)
+                {
+                    // The client's thread handles its own cleanup
+                }
+            }
+        }
+    }
+    
 }
