@@ -43,7 +43,12 @@ public abstract class ChatServer
         try
         {
             string name = connection.ReadLine();
-
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                connection.Send("Invalid name. Connection closed.");
+                return;
+            }
+            
             lock (sync)
             {
                 clients.Add(connection);
@@ -55,9 +60,16 @@ public abstract class ChatServer
                 BroadcastMessage(name + ": " + message);
             }
         }
-        catch (Exception)
+        catch (Exception ex) when 
+            (ex is IOException or ObjectDisposedException or InvalidOperationException)
         {
-            // client disconnected, or read failed, now to clean up 
+            // Connection closed or disposed
+            Console.WriteLine("Connection closed: " + ex.Message);
+        }
+        catch (Exception ex)
+        {
+            // Handle other exceptions
+            Console.WriteLine("Error: " + ex.Message);
         }
         finally
         {
@@ -70,26 +82,36 @@ public abstract class ChatServer
     }
     
     /// <summary>
-    /// Sends a message to every connected client, including the sender. Also handles failed
-    /// sends by removing them .
+    /// Sends a message to every connected client, including the sender.
+    /// Also handles failed sends by removing them .
     /// </summary>
     /// <param name="message">The string of characters to send.</param>
     private static void BroadcastMessage(string message)
     {
+        
+        List<NetworkConnection> clientsCopy;
         lock (sync)
         {
-            foreach (NetworkConnection client in clients)
+            // Copy the iterator
+            clientsCopy = new List<NetworkConnection>(clients);
+        }
+
+        foreach (NetworkConnection client in clientsCopy)
+        {
+            try
             {
-                try
+                client.Send(message);
+            }
+            catch (Exception)
+            {
+                // Remove the client from the list if sending fails
+                lock (sync)
                 {
-                    client.Send(message);
+                    clients.Remove(client);
                 }
-                catch (Exception)
-                {
-                    // The client's thread handles its own cleanup
-                }
+                client.Dispose();
             }
         }
+
     }
-    
 }

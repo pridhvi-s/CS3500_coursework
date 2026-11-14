@@ -28,6 +28,14 @@ public sealed class NetworkConnection : IDisposable
     private StreamWriter? _writer;
 
     /// <summary>
+    /// Send lock for thread safety when sending
+    /// messages. This prevents multiple threads
+    /// from writing to the same StreamWriter
+    /// simultaneously.
+    /// </summary>
+    private readonly object _sendLock = new();
+
+    /// <summary>
     ///   Initializes a new instance of the <see cref="NetworkConnection"/> class.
     ///   <para>
     ///     Create a network connection object.
@@ -78,8 +86,8 @@ public sealed class NetworkConnection : IDisposable
     public void Connect( string host, int port )
     {
         _tcpClient.Connect(host, port);
-        _reader = new StreamReader(_tcpClient.GetStream());
-        _writer = new StreamWriter(_tcpClient.GetStream()) {AutoFlush = true};
+        _reader = new StreamReader(_tcpClient.GetStream(), Encoding.UTF8);
+        _writer = new StreamWriter(_tcpClient.GetStream(), Encoding.UTF8) {AutoFlush = true};
     }
 
 
@@ -94,12 +102,24 @@ public sealed class NetworkConnection : IDisposable
     /// <param name="message"> The string of characters to send. </param>
     public void Send( string message )
     {
-        if (!IsConnected || _writer is null)
+        StreamWriter? writer = _writer;
+
+        if (!IsConnected || writer is null)
         {
             throw new InvalidOperationException("Connection failed");
         }
-        
-        _writer.WriteLine(message);
+
+        try
+        {
+            lock (_sendLock)
+            {
+                writer.WriteLine(message);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException)
+        {
+            throw new InvalidOperationException("Connection failed", ex);
+        }
     }
 
 
@@ -112,13 +132,23 @@ public sealed class NetworkConnection : IDisposable
     /// <returns> The contents of the message. </returns>
     public string ReadLine( )
     {
-        if (!IsConnected || _writer is null)
+        if (!IsConnected || _reader is null)
         {
             throw new InvalidOperationException("Connection failed");
         }
 
-        string? line = _reader.ReadLine();
-        
+        string? line;
+        try
+        {
+            line = _reader.ReadLine();
+        } 
+        catch (Exception ex) when 
+            (ex is IOException or ObjectDisposedException)
+        {
+            // If the connection is closed or disposed
+            throw new InvalidOperationException("Connection closed", ex);
+        }  
+
         // null if remote side closes connection
         if (line is null)
         {
@@ -134,11 +164,17 @@ public sealed class NetworkConnection : IDisposable
     /// </summary>
     public void Disconnect( )
     {
-        _reader?.Dispose();
-        _writer?.Dispose();
+        // Atomically take ownership
+        StreamWriter? writer = Interlocked.Exchange(ref _writer, null);
+        StreamReader? reader = Interlocked.Exchange(ref _reader, null);
+
+        try { writer?.Dispose(); }
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException) { }
+
+        try { reader?.Dispose(); }
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException) { }
+
         _tcpClient.Dispose();
-        _reader = null;
-        _writer = null;
     }
 
     /// <summary>

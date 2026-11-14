@@ -32,13 +32,23 @@ public static class Server
             {
                 while (true)
                 {
-                    TcpClient tcpClient = listener.AcceptTcpClient();
-                    NetworkConnection connection = new NetworkConnection(tcpClient);
-
-                    new Thread( () => handleConnect(connection)) {IsBackground = true}.Start();
+                    try
+                    {
+                        TcpClient tcpClient = listener.AcceptTcpClient();
+                        NetworkConnection connection = new NetworkConnection(tcpClient);
+                        new Thread( () => handleConnect(connection)) {IsBackground = true}.Start();
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // Listener has been stopped, exit the loop
+                        break;
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("Error accepting connection: " + e.Message);
+                    }
                 }
             }
         );
-
     }
 }
