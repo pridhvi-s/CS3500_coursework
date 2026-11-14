@@ -15,12 +15,12 @@ public abstract class ChatServer
     /// <summary>
     /// Stops two threads from writing to the same StreamWriter simultaneously
     /// </summary>
-    private static object sync = new();
+    private static readonly object sync = new();
     
     /// <summary>
     /// List of the clients that have sent a name
     /// </summary>
-    private static List<NetworkConnection> clients = new();
+    private static readonly List<NetworkConnection> clients = new();
 
     /// <summary>
     ///   The main program.
