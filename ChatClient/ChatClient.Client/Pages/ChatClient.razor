@@ -1,5 +1,6 @@
 ﻿@page "/chatclient"
 @rendermode InteractiveServer
+@using System.Diagnostics
 @using Networking
 
 
@@ -13,7 +14,7 @@
         <input id="url" disabled="@_network.IsConnected" type="text" @bind="_serverNameOrAddress" />
         <label for="url"> Port: </label>
         <input id="port" disabled="@_network.IsConnected" type="number" @bind="_serverPort" class="port" />
-        @if ( _network.IsConnected )
+        @if (_network.IsConnected)
         {
             <button class="btn btn-primary" @onclick="DisconnectFromServer">Disconnect</button>
         }
@@ -30,29 +31,36 @@
     }
 
     <div class="input-row">
-        <label for="message"> Chat (but first, enter your name): </label>
-        <input id="message" class="@grayedOut" disabled="@(disconnected)" type="text" @onchange="HandleSendMessage" />
+        <label for="username"> Name: </label>
+        <input id="username" type="text" @bind="_username" />
+        <label for="saveLog"> Save chat to file: </label>
+        <input id="saveLog" type="checkbox" disabled="@_network.IsConnected" @bind="_saveToFile" />
+    </div>
+    <div id="Messages" class="container @grayedOut">
+        @lock (_allMessages)
+        {
+            foreach (var line in _allMessages)
+            {
+                <span class="themClass">
+                    @line
+                </span>
+            }
+        }
     </div>
     <div class="input-row">
-        <div class="input-col">
-            <div id="Messages" class="container @grayedOut">
-                @lock (_allMessages) 
-                {
-                    foreach (var line in _allMessages) 
-                    { 
-                        <span class="themClass">
-                            @line
-                        </span>
-                    }
-                }
-            </div>
-        </div>
+        <label for="message"> Chat input: </label>
+        <input id="message" type="text" @onchange="HandleSendMessage" />
     </div>
 </div>
 
 
 @code
 {
+    /// <summary>
+    /// The name or address of the server to connect to
+    /// </summary>
+    private string _username = "Anonymous";
+
     /// <summary>
     /// Default server name
     /// </summary>
@@ -75,7 +83,7 @@
     {
         get
         {
-            return string.Join( "\n", _allMessages );
+            return string.Join("\n", _allMessages);
         }
     }
 
@@ -83,6 +91,17 @@
     /// All the messages seen by the server
     /// </summary>
     private readonly List<string> _allMessages = new();
+
+    /// <summary>
+    /// When true, server messages are collected in _logLines and written to a file on disconnect
+    /// instead of being displayed.
+    /// </summary>
+    private bool _saveToFile;
+
+    /// <summary>
+    /// Server messages in chronological order, saved when the connection ends.
+    /// </summary>
+    private readonly List<string> _logLines = new();
 
 
     /// <summary>
@@ -100,59 +119,100 @@
     /// </summary>
     private void ConnectToServer()
     {
+        if (_username == string.Empty)
+        {
+            MessageReceived("Please enter a username before connecting.");
+            return;
+        }
+
         try
         {
-            _network.Connect( _serverNameOrAddress, _serverPort );
+            ClearMessages();
+            _logLines.Clear();
+            _network.Connect(_serverNameOrAddress, _serverPort);
 
-            // Communicating with the server needs to be asynchronous so that the UI thread 
+            // Communicating with the server needs to be asynchronous so that the UI thread
             // can continue drawing.
-            new Thread( () =>
-            {
-                while ( _network.IsConnected )
-                {
-                    try
-                    {
-                        var message = _network.ReadLine();
-
-                        message = $"{DateTime.Now:HH:mm tt} - {message}";
-                        lock (_allMessages)
-                        {
-                            _allMessages.Insert( 0, message );
-                        }
-
-                        // Since we are changing the UI from another thread, we need to 
-                        // use the dispatcher for StateHasChanged
-                        InvokeAsync( StateHasChanged );
-                    }
-                    catch
-                    {
-                        // add anything needed here to handle a disconnection from the server
-                    }
-                }
-            } ).Start();
+            new Thread(() => ConnectionThread()).Start();
         }
-        catch
+        catch (Exception e)
         {
-            // add anything needed here to handle a failure to connect
+            MessageReceived($"Error connecting to server: {e.Message}");
         }
 
     }
 
+    private void ConnectionThread()
+    {
+        _network.Send($"{this._username}");
+        while (_network.IsConnected)
+        {
+            try
+            {
+                var message = _network.ReadLine();
+                if (_saveToFile)
+                    _logLines.Add(message);
+                else
+                    MessageReceived(message);
+            }
+            catch
+            {
+                _network.Dispose();
+                // Create a new network object so that the user can try to connect again
+                _network = new NetworkConnection();
+            }
+        }
+
+        if (_saveToFile)
+        {
+            try
+            {
+                var path = Path.GetFullPath($"chatlog_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+                File.WriteAllLines(path, _logLines);
+                MessageReceived($"Chat log saved to {path}");
+            }
+            catch (Exception e)
+            {
+                MessageReceived($"Failed to save chat log: {e.Message}");
+            }
+        }
+    }
+
+    private void ClearMessages()
+    {
+        lock (_allMessages)
+            _allMessages.Clear();
+
+        // Since we are changing the UI from another thread, we need to
+        // use the dispatcher for StateHasChanged
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void MessageReceived(string message)
+    {
+        lock (_allMessages)
+            _allMessages.Insert(0, message);
+
+        // Since we are changing the UI from another thread, we need to
+        // use the dispatcher for StateHasChanged
+        InvokeAsync(StateHasChanged);
+    }
+
     /// <summary>
-    ///   When the user types a message and presses enter, send the message
-    ///   to the server.
+    /// When the user types a message and presses enter, send the message
+    /// to the server.
     /// </summary>
     /// <param name="e"> Event data containing the message. </param>
-    private void HandleSendMessage( ChangeEventArgs e )
+    private void HandleSendMessage(ChangeEventArgs e)
     {
-        if ( e.Value != null )
+        if (e.Value != null)
         {
-            _network.Send( $"{e.Value}" );
+            _network.Send($"{e.Value}");
         }
     }
 
     /// <summary>
-    ///   Create a default network object
+    /// Create a default network object
     /// </summary>
     protected override void OnInitialized()
     {

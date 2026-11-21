@@ -11,6 +11,14 @@
             "projectPath": "/home/alex/Documents/GitHub/CS3500_coursework/Spreadsheet/GUI/GUI.csproj",
             "launchProfileName": "http",
             "launchConfigurationId": "http"
+        },
+        {
+            "name": "C#: ChatClient [http]",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "/home/alex/Documents/GitHub/CS3500_coursework/ChatClient/ChatClient/ChatClient.csproj",
+            "launchProfileName": "http",
+            "launchConfigurationId": "http"
         }
     ]
 }
