@@ -1,0 +1,22 @@
+<GameSettings>
+  <UniverseSize>2000</UniverseSize>
+  <MSPerFrame>30</MSPerFrame>
+  <RespawnRate>10</RespawnRate>
+
+  <Wall>
+    <p1><x>-1025</x><y>-1025</y></p1>
+    <p2><x>1025</x><y>-1025</y></p2>
+  </Wall>
+  <Wall>
+    <p1><x>-1025</x><y>1025</y></p1>
+    <p2><x>-1025</x><y>-1025</y></p2>
+  </Wall>
+  <Wall>
+    <p1><x>1025</x><y>1025</y></p1>
+    <p2><x>1025</x><y>-1025</y></p2>
+  </Wall>
+  <Wall>
+    <p1><x>1025</x><y>1025</y></p1>
+    <p2><x>-1025</x><y>1025</y></p2>
+  </Wall>
+</GameSettings>

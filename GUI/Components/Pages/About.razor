@@ -1,5 +1,38 @@
-﻿@page "/"
+@page "/"
 
 <PageTitle>About</PageTitle>
 
-<h1>Fill in your about page here</h1>
+<h1>Snake Client &ndash; About</h1>
+
+<p>
+    A Blazor client for the CS3500 Snake game. The server decides everything about the game
+    (movement, growth, collisions, respawns). This client only connects, draws what the server
+    sends, and forwards key presses. Open <a href="snake">Snake Game</a> to play.
+</p>
+
+<h2>How to use it</h2>
+<ul>
+    <li><b>Menu</b> (drawn inside the canvas): type the server IP, port and your name. <kbd>Tab</kbd> moves to the next field, <kbd>Backspace</kbd> deletes, <kbd>Enter</kbd> connects. Errors (bad port, refused connection, server closed) are shown on the menu.</li>
+    <li><b>Steering</b>: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or the arrow keys.</li>
+    <li><b>Zoom</b>: <kbd>N</kbd> zooms in, <kbd>M</kbd> zooms out (x1.25 per press, between 0.25 and 4).</li>
+    <li>The camera is centered on the head of your snake (the last vertex of its body).</li>
+</ul>
+
+<h2>Design (MVC)</h2>
+<ul>
+    <li><b>Model</b>: <code>GameState</code> (snakes, food, walls, board size, zoom, current screen), <code>ConnectMenu</code> (menu fields and error text), plus the JSON classes <code>Snake</code>, <code>Food</code>, <code>Wall</code>, <code>Vector2D</code>.</li>
+    <li><b>Controller</b>: <code>SnakeController</code> handles key presses (menu typing or game input), runs the network thread using the <code>NetworkConnection</code> class from PS8, parses server JSON and updates the model under a lock.</li>
+    <li><b>View</b>: <code>GameRenderView</code> draws the menu or the world from a copy (snapshot) of the model; it never changes the model. <code>SnakeGUI.razor</code> only wires the three together and redraws whenever a new server frame arrives (no timer, so the frame rate follows the server) until the page is closed.</li>
+    <li>The render loop works on a snapshot so the network thread and the drawing never touch the same data at once.</li>
+    <li>Colors follow the game rules: snake color is its ID mod 5 (blue, yellow, black, forest green, white); a snake that is not alive is drawn red; snakes flagged as disconnected are removed.</li>
+    <li>Sizes: snake stroke 10 world units, food 16, walls 50 wide, all scaled by the zoom.</li>
+    <li>Tests (<code>GUI.Tests</code>) cover the menu, zoom, camera math and the controller against a fake local server (handshake, steering, bad ports, refused/closed connections, reconnect, disconnected snakes).</li>
+</ul>
+
+<h2>Known limitations</h2>
+<ul>
+    <li>Walls are flat gray rectangles (no texture).</li>
+    <li>The menu is keyboard only (no mouse click to select a field).</li>
+    <li>When the server wraps a snake around the world edge the line stretches across the map; that is how the server reports it and we draw it as received.</li>
+    <li>The browser play-through against the course server has not been verified by an automated test; the networking is tested against a fake server.</li>
+</ul>

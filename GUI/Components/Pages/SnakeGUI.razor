@@ -1,9 +1,9 @@
 @page "/snake"
 @rendermode InteractiveServer
+@implements IAsyncDisposable
 @using Blazor.Extensions
 @using Blazor.Extensions.Canvas
 @using Blazor.Extensions.Canvas.Canvas2D
-@using System.Diagnostics
 @inject IJSRuntime JsRuntime;
 
 <PageTitle> Snake </PageTitle>
@@ -11,43 +11,102 @@
 <div id="snakeCanvas" style="position: fixed; width: 100%; height: 100%">
     <BECanvas Width="1000" Height="1000" @ref="_canvasReference"></BECanvas>
 </div>
+<img @ref="_appleRef" src="images/apple.png" style="display:none" />
+<img @ref="_grassSrcRef" src="images/grass.jpg" style="display:none" />
+<canvas @ref="_grassRef" width="256" height="256" style="display:none"></canvas>
+<canvas @ref="_worldGrassRef" width="1" height="1" style="display:none"></canvas>
 
 @code
 {
+    private ElementReference _appleRef;
+    private ElementReference _grassSrcRef;
+    private ElementReference _grassRef;
+    private ElementReference _worldGrassRef;
+    private int _grassWorldSize;
     private BECanvasComponent? _canvasReference;
     private Canvas2DContext? _context;
     private IJSObjectReference? _jsModule;
-
-
+    private DotNetObjectReference<SnakeGUI>? _selfReference;
+    private readonly CancellationTokenSource _cts = new();
+    private readonly SnakeController controller = new SnakeController();
+    private readonly GameRenderView renderView = new GameRenderView();
 
     protected override async Task OnAfterRenderAsync( bool firstRender )
     {
         if ( firstRender )
         {
             _jsModule = await JsRuntime.InvokeAsync<IJSObjectReference>( "import", "./Components/Pages/SnakeGUI.razor.js" );
-            _context = await _canvasReference.CreateCanvas2DAsync();
-            await JsRuntime.InvokeAsync<object>( "initRenderJS", DotNetObjectReference.Create( this ) );           
+            renderView.AppleImage = _appleRef;
+            await _jsModule.InvokeVoidAsync( "buildGrassTile", _grassRef, _grassSrcRef, GameRenderView.GrassFeather );
+            _context = await _canvasReference!.CreateCanvas2DAsync();
+            _selfReference = DotNetObjectReference.Create( this );
+            await JsRuntime.InvokeAsync<object>( "initRenderJS", _selfReference );
 
-            // TODO: Start the game loop
-
-            // in the meantime, draw something to initialize the canvas
-            // you may want to remove this after you are drawing something
-            await _context.SetFillStyleAsync( "lightblue" );
-            await _context.FillRectAsync( 0, 0, 1000, 1000 );
+            _ = RunGameLoopAsync( _cts.Token );
         }
     }
 
-
-
-    [JSInvokable]
-    public void HandleKeyPress( string key )
+    /// <summary> Draws a snapshot each time the controller reports a new frame (no timer), until the page is disposed. </summary>
+    private async Task RunGameLoopAsync( CancellationToken token )
     {
-        // TODO: Once the client is connected and the handshake is complete,
-        //       invoke some controller method to send the appropriate command to the server
+        try
+        {
+            while ( true )
+            {
+                await controller.WaitForFrameAsync( token );
+                try
+                {
+                    controller.GameStateForDrawing( ref renderView.renderState );
+                    int size = renderView.renderState.BoardSize;
+                    if ( size > 0 && size != _grassWorldSize )
+                    {
+                        await _jsModule!.InvokeVoidAsync( "buildGrassWorld", _worldGrassRef, _grassRef, size, GameRenderView.GrassTileSize( size ), GameRenderView.GrassFeather, GameRenderView.GrassScale( size ) );
+                        _grassWorldSize = size;
+                        renderView.GrassWorld = _worldGrassRef;
+                    }
 
-
-        // TODO: Remove this, which is just here to show you what the 'key' string is for whatever key you pressed
-        Debug.WriteLine("key pressed: " + key);
+                    await renderView.RenderGameAsync( _context! );
+                }
+                catch ( Exception ex ) when ( ex is not OperationCanceledException )
+                {
+                    // A failed frame (e.g. the browser is mid-reload) must not stop the loop.
+                    Console.Error.WriteLine( $"Render error: {ex.Message}" );
+                }
+            }
+        }
+        catch ( OperationCanceledException )
+        {
+            // Page was disposed.
+        }
     }
 
+    [JSInvokable]
+    public void HandleKeyPress( string key ) => controller.HandleKey( key );
+
+    public async ValueTask DisposeAsync()
+    {
+        _cts.Cancel();
+        controller.Disconnect();
+        try
+        {
+            await JsRuntime.InvokeVoidAsync( "disposeRenderJS" );
+        }
+        catch ( Exception ex ) when ( ex is JSDisconnectedException or InvalidOperationException )
+        {
+            // The circuit is already gone.
+        }
+
+        _selfReference?.Dispose();
+        if ( _jsModule != null )
+        {
+            try
+            {
+                await _jsModule.DisposeAsync();
+            }
+            catch ( JSDisconnectedException )
+            {
+                // The circuit is already gone.
+            }
+        }
+    }
 }
